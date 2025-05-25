@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Віртуальна лабораторія з архітектури комп'ютера</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Віртуальна лабораторія з архітектури комп'ютера</h1>
+        <div class="header-buttons">
+            <button class="header-btn tutorial-btn" id="tutorialBtn">Відео-туторіал</button>
+            <button class="header-btn" id="aboutBtn">Про нас</button>
+        </div>
+    </header>
+    
+    <!-- Модальне вікно "Про нас" -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeAboutBtn">&times;</span>
+            <h3>Про нас</h3>
+            <p>Створено студентами групи 4-Е-33</p>
+            <p>Єсипчуком Вячеславом та Чесним Владиславом</p>
+            <p>Зворотній зв'язок: evilgamerx228@gmail.com +380507725344</p>
+        </div>
+    </div>
+    
+    <!-- Модальне вікно для відео-туторіалу -->
+    <div id="tutorialModal" class="modal">
+        <div class="modal-content video-modal-content">
+            <span class="close-btn" id="closeTutorialBtn">&times;</span>
+            <h3>Відео-туторіал з використання лабораторії</h3>
+            <div class="video-container">
+                <!-- Тут можна замінити на посилання на своє відео (YouTube, або локальне) -->
+                <iframe 
+                    src="videos/tutorial.mp4" 
+                    title="Туторіал з використання лабораторії" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>Доступні лабораторні роботи</h2>
+        <div class="lab-grid">
+            <div class="lab-card">
+                <div class="text-content">
+                    <h3>Компоненти комп'ютера</h3>
+                    <p>Вивчення основних компонентів комп'ютера та їх взаємодії.</p>
+                </div>
+                <div class="image-container">
+                    <img src="assets/icons/labARX.png" alt="Компоненти комп'ютера" class="lab-image">
+                </div>
+                <div class="button-container">
+                    <a href="virtualka.html" class="btn">Розпочати</a>
+                </div>
+            </div>
+            
+            <div class="lab-card">
+                <div class="text-content">
+                    <h3>Периферійні пристрої</h3>
+                    <p>Дослідження різних типів периферійних пристроїв та їх принципів роботи.</p>
+                </div>
+                <div class="image-container">
+                    <img src="assets/icons/labPER.png" alt="Периферійні пристрої" class="lab-image">
+                </div>
+                <div class="button-container">
+                    <a href="virtualka2.html" class="btn">Розпочати</a>
+                </div>
+            </div>
+            
+            <div class="lab-card">
+                <div class="text-content">
+                    <h3>Лабораторія конвертування систем числення</h3>
+                    <p>Вивчення та практика конвертування між двійковою, десятковою, шістнадцятковою та іншими системами числення.</p>
+                </div>
+                <div class="image-container">
+                    <img src="assets/icons/labSYS.png" alt="Конвертування систем числення" class="lab-image">
+                </div>
+                <div class="button-container">
+                    <a href="virtualka3.html" class="btn">Розпочати</a>
+                </div>
+            </div>
+            
+            <div class="lab-card">
+                <div class="text-content">
+                    <h3>Лабораторія конвертування машинного коду в асемблер</h3>
+                    <p>Практичні завдання з перетворення машинного коду у відповідні інструкції мови асемблера.</p>
+                </div>
+                <div class="image-container">
+                    <img src="assets/icons/labMASH.png" alt="Конвертування машинного коду в асемблер" class="lab-image">
+                </div>
+                <div class="button-container">
+                    <a href="virtualka4.html" class="btn">Розпочати</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Отримання елементів модальних вікон
+        const aboutModal = document.getElementById("aboutModal");
+        const tutorialModal = document.getElementById("tutorialModal");
+        
+        // Отримання кнопок
+        const aboutBtn = document.getElementById("aboutBtn");
+        const tutorialBtn = document.getElementById("tutorialBtn");
+        
+        // Отримання кнопок закриття
+        const closeAboutBtn = document.getElementById("closeAboutBtn");
+        const closeTutorialBtn = document.getElementById("closeTutorialBtn");
+        
+        // Відкриття модального вікна "Про нас"
+        aboutBtn.onclick = function() {
+            aboutModal.style.display = "block";
+        }
+        
+        // Відкриття модального вікна з відео-туторіалом
+        tutorialBtn.onclick = function() {
+            tutorialModal.style.display = "block";
+        }
+        
+        // Закриття модального вікна "Про нас"
+        closeAboutBtn.onclick = function() {
+            aboutModal.style.display = "none";
+        }
+        
+        // Закриття модального вікна з відео-туторіалом
+        closeTutorialBtn.onclick = function() {
+            tutorialModal.style.display = "none";
+        }
+        
+        // Закриття модальних вікон при кліку поза ними
+        window.onclick = function(event) {
+            if (event.target == aboutModal) {
+                aboutModal.style.display = "none";
+            }
+            if (event.target == tutorialModal) {
+                tutorialModal.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>

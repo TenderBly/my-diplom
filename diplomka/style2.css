@@ -1,0 +1,364 @@
+       /* Стилі для повідомлень про зони клавіатури */
+        .keyboard-message {
+            position: absolute;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            border-radius: 5px;
+            z-index: 1000;
+            font-weight: bold;
+            max-width: 250px;
+            text-align: center;
+        }
+        
+        .pink-message {
+            background-color: #ffddee;
+            border-color: #ff66aa;
+        }
+        
+        .red-message {
+            background-color: #ffdddd;
+            border-color: #ff6666;
+        }
+        
+        .blue-message {
+            background-color: #ddddff;
+            border-color: #6666ff;
+        }
+        
+        .purple-message {
+            background-color: #eeddff;
+            border-color: #9966ff;
+        }
+        
+        /* Додаємо стиль для жовтої зони */
+        .yellow-message {
+            background-color: #ffffdd;
+            border-color: #cccc00;
+        }
+        
+        /* Додаємо стиль для зеленої зони */
+        .green-message {
+            background-color: #ddffdd;
+            border-color: #66cc66;
+        }
+
+        /* Додаємо стиль для заголовка, щоб він виглядав як посилання */
+        header h1 {
+            cursor: pointer;
+            color: #0066cc;
+            text-decoration: underline;
+        }
+        header h1:hover {
+            color: #003366;
+        }
+		
+	 body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 100px);
+            background-color: #e0e0e0;
+            padding: 20px;
+        }
+
+        #app {
+            display: flex;
+            position: relative;
+            width: 100%;
+            max-width: 2000px; /* Modified: increased from 1000px */
+        }
+
+        #side-panel {
+            width: 200px;
+            background-color: #444;
+            color: #fff;
+            padding: 10px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+            overflow-y: auto;
+            flex-shrink: 0;
+            height: 685px;
+        }
+
+        #lab-container {
+            position: relative;
+            width: 2000px; /* Modified: increased from 800px */
+            height: 700px;
+            background-color: #fff;
+            border: 2px solid #333;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin-left: 0;
+            flex-grow: 0;
+            overflow-x: auto; /* Added to make horizontal scrolling possible */
+        }
+
+        #lab-canvas {
+            width: 1640px; /* Modified: increased from 800px */
+            height: 700px;
+            display: block;
+        }
+
+        .component {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+            padding: 8px;
+            background-color: #666;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 5px;
+            text-align: center;
+            position: relative;
+        }
+
+        .component img {
+            width: 40px;
+            height: 40px;
+            margin-top: 5px;
+            border-radius: 3px;
+        }
+
+        footer {
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            text-align: center;
+        }
+		
+		.context-menu {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #ccc;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.context-menu-item {
+    padding: 8px 15px;
+    cursor: pointer;
+}
+
+.context-menu-item:hover {
+    background: #eee;
+}
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transition: opacity 0.3s;
+        }
+        /* Стилі для відображення лімітів компонентів */
+        .component {
+            position: relative;
+        }
+        .component-counter {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        .component.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* Стилі для діалогу вибору виробника */
+        .manufacturer-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .manufacturer-dialog-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 300px;
+            width: 100%;
+        }
+        
+        .manufacturer-dialog h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        
+        .manufacturer-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .manufacturer-button {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        
+        .manufacturer-button.red {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .manufacturer-button.blue {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .manufacturer-button.green {
+            background-color: #2ecc71;
+            color: white;
+        }
+        
+        .manufacturer-button:hover {
+            opacity: 0.9;
+        }
+        .manufacturer-badge {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .manufacturer-badge.amd {
+            background-color: #ED1C24;
+        }
+        .manufacturer-badge.intel {
+            background-color: #0071C5;
+        }
+
+        /* Стилі для відображення координат миші */
+        .coordinates-display {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+		
+		#checklist {
+			padding: 10px;
+			border-bottom: 1px solid #ccc;
+			margin-bottom: 10px;
+		}
+		#checklist h3 {
+			font-size: 16px;
+			margin-bottom: 8px;
+		}
+		#checklist ul {
+			list-style: none;
+			padding: 0;
+		}
+		#checklist li {
+			margin: 5px 0;
+			font-size: 14px;
+		}
+		#checklist .completed {
+			color: green;
+		}
+		
+		.video-help-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 100%;
+            background-color: white;
+            box-shadow: -4px 0 10px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+            transform: translateX(100%);
+        }
+        
+        .video-help-panel.visible {
+            transform: translateX(0);
+        }
+        
+        .video-help-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background-color: #2980b9;
+            color: white;
+        }
+        
+        .video-help-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .close-video-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .video-container {
+            flex-grow: 1;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .video-container video {
+            width: 100%;
+            max-height: 300px;
+            margin-bottom: 15px;
+        }
+        
+        .video-description {
+            width: 100%;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }

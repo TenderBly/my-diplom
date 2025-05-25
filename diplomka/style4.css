@@ -1,0 +1,324 @@
+        header h1 {
+            cursor: pointer;
+            color: #0066cc;
+            text-decoration: underline;
+        }
+        header h1:hover {
+            color: #003366;
+        }
+		
+	 body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 100px);
+            background-color: #e0e0e0;
+            padding: 20px;
+        }
+
+        #app {
+            display: flex;
+            position: relative;
+            width: 100%;
+            max-width: 1000px; /* Modified: increased from 1000px */
+        }
+
+        #side-panel {
+            width: 200px;
+            background-color: #444;
+            color: #fff;
+            padding: 10px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+            overflow-y: auto;
+            flex-shrink: 0;
+            height: 685px;
+        }
+
+        #lab-container {
+            position: relative;
+            width: 1000px;
+            height: 700px;
+            background-color: #fff;
+            border: 2px solid #333;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin-left: 0;
+            flex-grow: 0;
+            overflow-x: auto; /* Added to make horizontal scrolling possible */
+        }
+
+        #lab-canvas {
+            width: 1000px; /* Modified: increased from 800px */
+            height: 700px;
+            display: block;
+        }
+
+		.converter-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .number-section {
+            margin-bottom: 30px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .number-section h2 {
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .input-group input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            border-color: #4CAF50;
+            outline: none;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+        }
+        
+        .input-group input.error {
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
+        
+        .convert-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+            width: 100%;
+        }
+        
+        .convert-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .result-section {
+            margin-top: 30px;
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .result-section h3 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        
+        .result-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .result-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .result-value {
+            font-family: monospace;
+            font-size: 18px;
+            color: #333;
+            word-break: break-all;
+        }
+        
+        .error-message {
+            color: #f44336;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+        
+        .system-select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        
+        /* Таблиця візуалізації конвертації */
+        .conversion-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-family: monospace;
+        }
+        
+        .conversion-table th {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .conversion-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+        }
+        
+        .conversion-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .info-box h3 {
+            color: #0d47a1;
+            margin-top: 0;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .mode-selector button {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            background-color: #f5f5f5;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .mode-selector button.active {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        
+        .converter-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .architecture-selector {
+            margin: 15px 0;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .code-result {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+        
+        .copy-btn {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .instruction-table table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .instruction-table th, .instruction-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .instruction-table th {
+            background-color: #f2f2f2;
+        }
+        
+        .machine-code-cell {
+            font-family: monospace;
+            background-color: #f9f9f9;
+        }
+        
+        .assembly-cell {
+            font-family: monospace;
+            font-weight: bold;
+        }
+        
+        .error {
+            border-color: #ff0000 !important;
+        }
+        
+        .error-message {
+            color: #ff0000;
+            font-size: 0.9em;
+            margin-top: 5px;
+            display: block;
+        }
