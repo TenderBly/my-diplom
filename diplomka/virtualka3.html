@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <title>Лабораторія конвертування систем числення</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+	<link rel="stylesheet" href="style3.css">
+</head>
+<body>
+    <header>
+        <h1 onclick="window.location.href='main.html'">Лабораторія конвертування систем числення</h1>
+    </header>
+    <main>
+        <div id="app" class="converter-container">
+            <div class="left-column">
+                <div class="number-section">
+                    <h2>Введіть число для конвертації</h2>
+                    
+                    <div class="input-group">
+                        <label for="system-select">Оберіть початкову систему числення:</label>
+                        <select id="system-select" v-model="inputSystem" class="system-select">
+                            <option value="2">Двійкова (основа 2)</option>
+                            <option value="8">Вісімкова (основа 8)</option>
+                            <option value="10">Десяткова (основа 10)</option>
+                            <option value="16">Шістнадцяткова (основа 16)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="number-input">Введіть число:</label>
+                        <input 
+                            type="text" 
+                            id="number-input" 
+                            v-model="inputNumber" 
+                            :class="{ error: inputError }"
+                            placeholder="Введіть число"
+                        >
+                        <span class="error-message" v-if="inputError">{{ errorMessage }}</span>
+                    </div>
+                    
+                    <button class="convert-btn" @click="convertNumber">Конвертувати</button>
+                </div>
+            </div>
+            
+            <div class="right-column">
+                <div class="result-section" v-if="hasResults">
+                    <h3>Результати конвертації</h3>
+                    
+                    <div class="results-grid">
+                        <div class="result-item" v-if="inputSystem !== '2'">
+                            <div class="result-header">
+                                <span class="result-label">Двійкова (основа 2):</span>
+                            </div>
+                            <div class="result-value">{{ results.binary }}</div>
+                            <button class="explain-btn" @click="showExplanation('binary')">Пояснити</button>
+                        </div>
+                        
+                        <div class="result-item" v-if="inputSystem !== '8'">
+                            <div class="result-header">
+                                <span class="result-label">Вісімкова (основа 8):</span>
+                            </div>
+                            <div class="result-value">{{ results.octal }}</div>
+                            <button class="explain-btn" @click="showExplanation('octal')">Пояснити</button>
+                        </div>
+                        
+                        <div class="result-item" v-if="inputSystem !== '10'">
+                            <div class="result-header">
+                                <span class="result-label">Десяткова (основа 10):</span>
+                            </div>
+                            <div class="result-value">{{ results.decimal }}</div>
+                            <button class="explain-btn" @click="showExplanation('decimal')">Пояснити</button>
+                        </div>
+                        
+                        <div class="result-item" v-if="inputSystem !== '16'">
+                            <div class="result-header">
+                                <span class="result-label">Шістнадцяткова (основа 16):</span>
+                            </div>
+                            <div class="result-value">{{ results.hexadecimal }}</div>
+                            <button class="explain-btn" @click="showExplanation('hexadecimal')">Пояснити</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="number-section explanation-section" v-if="currentExplanation">
+                <h2>{{ currentExplanation.title }}</h2>
+                <div v-html="currentExplanation.content"></div>
+                <button class="convert-btn" @click="closeExplanation" style="background-color: #f44336;">Закрити пояснення</button>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>© 2025 Віртуальна лабораторія. Всі права захищені.</p>
+    </footer>
+    <script>
+        const { createApp } = Vue;
+        const app = createApp({
+            data() {
+                return {
+                    inputSystem: "10",
+                    inputNumber: "",
+                    inputError: false,
+                    errorMessage: "",
+                    hasResults: false,
+                    results: {
+                        binary: "",
+                        octal: "",
+                        decimal: "",
+                        hexadecimal: ""
+                    },
+                    currentExplanation: null,
+                    decimalValue: 0
+                }
+            },
+            methods: {
+                validateInput() {
+                    this.inputError = false;
+                    this.errorMessage = "";
+                    
+                    if (!this.inputNumber.trim()) {
+                        this.inputError = true;
+                        this.errorMessage = "Будь ласка, введіть число";
+                        return false;
+                    }
+                    
+                    const patterns = {
+                        "2": /^[01]+$/,
+                        "8": /^[0-7]+$/,
+                        "10": /^[0-9]+$/,
+                        "16": /^[0-9A-Fa-f]+$/
+                    };
+                    
+                    if (!patterns[this.inputSystem].test(this.inputNumber.trim())) {
+                        this.inputError = true;
+                        this.errorMessage = `Некоректне число для ${this.getSystemName(this.inputSystem)} системи числення`;
+                        return false;
+                    }
+                    
+                    return true;
+                },
+                
+                getSystemName(base) {
+                    const systems = {
+                        "2": "двійкової",
+                        "8": "вісімкової",
+                        "10": "десяткової",
+                        "16": "шістнадцяткової"
+                    };
+                    return systems[base];
+                },
+                
+                convertNumber() {
+                    if (!this.validateInput()) {
+                        this.hasResults = false;
+                        this.currentExplanation = null;
+                        return;
+                    }
+                    
+                    this.decimalValue = parseInt(this.inputNumber, parseInt(this.inputSystem));
+                    
+                    this.results = {
+                        binary: this.decimalValue.toString(2),
+                        octal: this.decimalValue.toString(8),
+                        decimal: this.decimalValue.toString(10),
+                        hexadecimal: this.decimalValue.toString(16).toUpperCase()
+                    };
+                    
+                    this.hasResults = true;
+                    this.currentExplanation = null;
+                },
+                
+                showExplanation(system) {
+                    const explanations = {
+                        binary: this.generateBinaryExplanation(),
+                        octal: this.generateOctalExplanation(),
+                        decimal: this.generateDecimalExplanation(),
+                        hexadecimal: this.generateHexExplanation()
+                    };
+                    
+                    this.currentExplanation = explanations[system];
+                },
+                
+                closeExplanation() {
+                    this.currentExplanation = null;
+                },
+                
+                generateBinaryExplanation() {
+                    const inputSystem = parseInt(this.inputSystem);
+                    let content = `<h3>Двійкова система числення (основа 2)</h3>`;
+                    content += `<p>Двійкова система використовує тільки цифри 0 та 1. Кожна позиція представляє степінь числа 2.</p>`;
+                    
+                    if (inputSystem !== 2) {
+                        content += `<h4>Конвертація з десяткового числа ${this.decimalValue} в двійкову систему:</h4>`;
+                        content += `<p>Для конвертації використовується метод послідовного ділення на 2:</p>`;
+                        
+                        const steps = this.divisionSteps(this.decimalValue, 2);
+                        content += `<div class="division-steps">`;
+                        
+                        for (let step of steps) {
+                            content += `<div>${step.number} ÷ 2 = ${step.quotient} із залишком ${step.remainder}</div>`;
+                        }
+                        
+                        content += `<p><strong>Збираємо залишки знизу вгору: ${this.results.binary}</strong></p></div>`;
+                    } else {
+                        content += `<h4>Пояснення двійкового числа ${this.inputNumber}:</h4>`;
+                        content += this.explainFromBinary(this.inputNumber);
+                    }
+                    
+                    return {
+                        title: "Пояснення двійкової системи",
+                        content: content
+                    };
+                },
+                
+                generateOctalExplanation() {
+                    const inputSystem = parseInt(this.inputSystem);
+                    let content = `<h3>Вісімкова система числення (основа 8)</h3>`;
+                    content += `<p>Вісімкова система використовує цифри від 0 до 7. Кожна позиція представляє степінь числа 8.</p>`;
+                    
+                    if (inputSystem !== 8) {
+                        content += `<h4>Конвертація з десяткового числа ${this.decimalValue} в вісімкову систему:</h4>`;
+                        content += `<p>Для конвертації використовується метод послідовного ділення на 8:</p>`;
+                        
+                        const steps = this.divisionSteps(this.decimalValue, 8);
+                        content += `<div class="division-steps">`;
+                        
+                        for (let step of steps) {
+                            content += `<div>${step.number} ÷ 8 = ${step.quotient} із залишком ${step.remainder}</div>`;
+                        }
+                        
+                        content += `<p><strong>Збираємо залишки знизу вгору: ${this.results.octal}</strong></p></div>`;
+                    } else {
+                        content += `<h4>Пояснення вісімкового числа ${this.inputNumber}:</h4>`;
+                        content += this.explainFromBase(this.inputNumber, 8);
+                    }
+                    
+                    return {
+                        title: "Пояснення вісімкової системи",
+                        content: content
+                    };
+                },
+                
+                generateDecimalExplanation() {
+                    const inputSystem = parseInt(this.inputSystem);
+                    let content = `<h3>Десяткова система числення (основа 10)</h3>`;
+                    content += `<p>Десяткова система використовує цифри від 0 до 9. Це найпоширеніша система числення.</p>`;
+                    
+                    if (inputSystem !== 10) {
+                        content += `<h4>Конвертація з ${this.getSystemName(this.inputSystem)} системи в десяткову:</h4>`;
+                        content += this.explainFromBase(this.inputNumber.toUpperCase(), inputSystem);
+                    } else {
+                        content += `<h4>Десяткове число ${this.inputNumber}:</h4>`;
+                        content += `<p>Це число вже знаходиться в десятковій системі числення.</p>`;
+                        content += `<p>Кожна цифра представляє степінь числа 10, починаючи з 10<sup>0</sup> справа.</p>`;
+                    }
+                    
+                    return {
+                        title: "Пояснення десяткової системи",
+                        content: content
+                    };
+                },
+                
+                generateHexExplanation() {
+                    const inputSystem = parseInt(this.inputSystem);
+                    let content = `<h3>Шістнадцяткова система числення (основа 16)</h3>`;
+                    content += `<p>Шістнадцяткова система використовує цифри 0-9 та літери A-F (де A=10, B=11, C=12, D=13, E=14, F=15).</p>`;
+                    
+                    if (inputSystem !== 16) {
+                        content += `<h4>Конвертація з десяткового числа ${this.decimalValue} в шістнадцяткову систему:</h4>`;
+                        content += `<p>Для конвертації використовується метод послідовного ділення на 16:</p>`;
+                        
+                        const steps = this.divisionSteps(this.decimalValue, 16);
+                        content += `<div class="division-steps">`;
+                        
+                        for (let step of steps) {
+                            let remainderDisplay = step.remainder;
+                            if (step.remainder > 9) {
+                                const hexChars = "0123456789ABCDEF";
+                                remainderDisplay = `${step.remainder} (${hexChars[step.remainder]})`;
+                            }
+                            content += `<div>${step.number} ÷ 16 = ${step.quotient} із залишком ${remainderDisplay}</div>`;
+                        }
+                        
+                        content += `<p><strong>Збираємо залишки знизу вгору: ${this.results.hexadecimal}</strong></p></div>`;
+                    } else {
+                        content += `<h4>Пояснення шістнадцяткового числа ${this.inputNumber}:</h4>`;
+                        content += this.explainFromBase(this.inputNumber.toUpperCase(), 16);
+                    }
+                    
+                    return {
+                        title: "Пояснення шістнадцяткової системи",
+                        content: content
+                    };
+                },
+                
+                divisionSteps(decimal, base) {
+                    const steps = [];
+                    let number = decimal;
+                    
+                    while (number > 0) {
+                        const remainder = number % base;
+                        steps.push({
+                            number: number,
+                            divisor: base,
+                            quotient: Math.floor(number / base),
+                            remainder: remainder
+                        });
+                        number = Math.floor(number / base);
+                    }
+                    
+                    return steps;
+                },
+                
+                explainFromBinary(binaryStr) {
+                    let content = `<p>Для конвертації в десяткову систему кожну цифру множимо на відповідний степінь числа 2:</p>`;
+                    content += `<div class="division-steps">`;
+                    
+                    let sum = 0;
+                    for (let i = 0; i < binaryStr.length; i++) {
+                        const position = binaryStr.length - 1 - i;
+                        const digit = parseInt(binaryStr[i]);
+                        const value = digit * Math.pow(2, position);
+                        sum += value;
+                        
+                        content += `<div>${binaryStr[i]} × 2<sup>${position}</sup> = ${digit} × ${Math.pow(2, position)} = ${value}</div>`;
+                    }
+                    
+                    content += `<p><strong>Сума: ${sum}</strong></p></div>`;
+                    return content;
+                },
+                
+                explainFromBase(numberStr, base) {
+                    let content = `<p>Для конвертації в десяткову систему кожну цифру множимо на відповідний степінь числа ${base}:</p>`;
+                    content += `<div class="division-steps">`;
+                    
+                    let sum = 0;
+                    for (let i = 0; i < numberStr.length; i++) {
+                        const position = numberStr.length - 1 - i;
+                        const digit = parseInt(numberStr[i], base);
+                        const value = digit * Math.pow(base, position);
+                        sum += value;
+                        
+                        let digitDisplay = numberStr[i];
+                        if (base === 16 && isNaN(parseInt(numberStr[i]))) {
+                            digitDisplay = `${numberStr[i]} (${digit})`;
+                        }
+                        
+                        content += `<div>${digitDisplay} × ${base}<sup>${position}</sup> = ${digit} × ${Math.pow(base, position)} = ${value}</div>`;
+                    }
+                    
+                    content += `<p><strong>Сума: ${sum}</strong></p></div>`;
+                    return content;
+                }
+            }
+        });
+        app.mount('#app');
+    </script>
+</body>
+</html>

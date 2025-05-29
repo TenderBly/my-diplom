@@ -1,3 +1,12 @@
+		header h1 {
+            cursor: pointer;
+            color: #0066cc;
+            text-decoration: underline;
+        }
+        header h1:hover {
+            color: #003366;
+        }
+		
 		body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -25,6 +34,8 @@
             position: relative;
             width: 100%;
             max-width: 2000px; /* ширина поля лабы */
+			flex-direction: row;
+            gap: 20px;
         }
 
         #side-panel {
@@ -36,6 +47,7 @@
             overflow-y: auto;
             flex-shrink: 0;
             height: 800px;
+			border-right: 1px solid #ccc;
         }
 
         #lab-container {
@@ -51,8 +63,9 @@
         }
 
         #lab-canvas {
-            width: 800px; /* Modified: increased from 800px */
-            height: 600px;
+            width: 100%;
+            max-width: 1500px;
+            height: 800px;
             display: block;
         }
 
@@ -86,7 +99,7 @@
         }
 		
         .context-menu {
-            position: absolute;
+            position: fixed;
             background-color: white;
             border: 1px solid #ccc;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
@@ -94,11 +107,11 @@
             z-index: 1000;
         }
         .context-menu-item {
-            padding: 8px 15px;
+            padding: 8px 12px;
             cursor: pointer;
         }
         .context-menu-item:hover {
-            background-color: #f0f0f0;
+            background: #f0f0f0;
         }
         /* Стилі для повідомлення про обмеження */
         .notification {
@@ -107,7 +120,7 @@
             right: 20px;
             background-color: #f44336;
             color: white;
-            padding: 15px;
+            padding: 10px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             z-index: 1000;
@@ -134,10 +147,15 @@
         /* Стилі для діалогу вибору виробника */
         .manufacturer-dialog {
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 50%;
+            left: 50%;
             width: 100%;
             height: 100%;
+			transform: translate(-50%, -50%);
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            padding: 20px;
+            border-radius: 5px;
             background-color: rgba(0, 0, 0, 0.5);
             display: flex;
             justify-content: center;
@@ -152,10 +170,21 @@
             text-align: center;
             width: 300px;
         }
+		.manufacturer-options div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .manufacturer-options h4 {
+            margin: 10px 0 5px;
+            font-size: 16px;
+        }
+
         .manufacturer-options {
             display: flex;
             justify-content: space-between;
             margin-top: 20px;
+			gap: 10px;
         }
         .manufacturer-button {
             padding: 10px 20px;
@@ -166,15 +195,31 @@
             font-size: 16px;
             transition: background-color 0.2s;
             flex-grow: 1;
-            margin: 0 5px;
+            margin: 5px 0;
+        }
+        .manufacturer-button.disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         .manufacturer-button.amd {
-            background-color: #ED1C24;
-            color: white;
+            background: #ED1C24;
+            color: #fff;
         }
         .manufacturer-button.intel {
-            background-color: #0071C5;
-            color: white;
+            background: #0071C5;
+            color: #fff;
+        }
+        .manufacturer-button.nvidia {
+            background: #76B900;
+            color: #fff;
+        }
+        .manufacturer-button.kingston {
+            background: #000000;
+            color: #fff;
+        }
+        .manufacturer-button.gskill {
+            background: #FF0000;
+            color: #fff;
         }
         .manufacturer-button:hover {
             opacity: 0.9;
@@ -204,27 +249,41 @@
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 5px 10px;
-            border-radius: 4px;
+            border-radius: 3px;
             font-size: 14px;
             z-index: 1000;
         }
-#checklist {
-    padding: 10px;
-    border-bottom: 1px solid #ccc;
-    margin-bottom: 10px;
-}
-#checklist h3 {
-    font-size: 16px;
-    margin-bottom: 8px;
-}
-#checklist ul {
-    list-style: none;
-    padding: 0;
-}
-#checklist li {
-    margin: 5px 0;
-    font-size: 14px;
-}
-#checklist .completed {
-    color: green;
-}
+		#checklist {
+			padding: 10px;
+			border-bottom: 1px solid #ccc;
+			margin-bottom: 10px;
+		}
+		#checklist h3 {
+			font-size: 16px;
+			margin-bottom: 8px;
+		}
+		#checklist ul {
+			list-style: none;
+			padding: 0;
+		}
+		#checklist li {
+			margin: 5px 0;
+			font-size: 14px;
+		}
+		#checklist .completed {
+			color: green;
+		}
+        #details-panel {
+            width: 300px;
+            padding: 10px;
+            border-left: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+		#details-panel h3 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+        #details-panel p {
+            margin: 10px 0;
+            font-size: 14px;
+        }

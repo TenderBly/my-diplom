@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <title>Лабораторія конвертування машинного коду та асемблера</title>
+    <link rel="stylesheet" href="style3.css">
+    <!-- Підключаємо Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="style4.css">
+</head>
+<body>
+    <header>
+        <h1 onclick="window.location.href='main.html'">Лабораторія конвертування машинного коду та асемблера</h1>
+    </header>
+    <main>
+        <div id="app" class="converter-container">
+            
+            <div class="converter-section">
+                <div class="top-controls">
+                    <div class="conversion-mode">
+                        <label>Режим конвертації:</label>
+                        <div class="mode-selector">
+                            <button :class="{ active: conversionMode === 'toAssembly' }" @click="conversionMode = 'toAssembly'">
+                                Машинний код → Асемблер
+                            </button>
+                            <button :class="{ active: conversionMode === 'toMachine' }" @click="conversionMode = 'toMachine'">
+                                Асемблер → Машинний код
+                            </button>
+							<button class="help-btn" @click="showHelp = !showHelp">
+								{{ showHelp ? 'Приховати допомогу' : 'Принцип роботи' }}
+							</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="help-section" v-if="showHelp">
+                    <h3>Принцип роботи конвертування</h3>
+                    <div class="help-content">
+                        <div class="help-mode" v-if="conversionMode === 'toAssembly'">
+                            <h4>Конвертування машинного коду в асемблер:</h4>
+                            <ul>
+                                <li><strong>Формат вводу:</strong> Шістнадцятковий код, розділений пробілами (наприклад: 8B 45 FC)</li>
+                                <li><strong>Процес:</strong> Кожен байт або група байтів відповідає конкретній машинній інструкції</li>
+                                <li><strong>Результат:</strong> Читабельні асемблерні команди з поясненням</li>
+                                <li><strong>Приклади інструкцій:</strong>
+                                    <ul>
+                                        <li>8B 45 FC → mov eax, [ebp-4] (завантаження з пам'яті)</li>
+                                        <li>83 C0 01 → add eax, 1 (додавання константи)</li>
+                                        <li>50 → push eax (збереження в стек)</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="help-mode" v-if="conversionMode === 'toMachine'">
+                            <h4>Конвертування асемблера в машинний код:</h4>
+                            <ul>
+                                <li><strong>Формат вводу:</strong> Асемблерні команди, кожна на новому рядку</li>
+                                <li><strong>Процес:</strong> Кожна асемблерна інструкція перетворюється в відповідний машинний код</li>
+                                <li><strong>Підтримувані команди:</strong> mov, add, sub, push, pop, ret</li>
+                                <li><strong>Підтримувані регістри:</strong>
+                                    <ul>
+                                        <li>x86: eax, ebx, [ebp-4] та ін.</li>
+                                        <li>x64: rax, rbx, [rbp-8] та ін.</li>
+                                        <li>ARM: r0, r1, [sp] та ін.</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Приклади:</strong>
+                                    <ul>
+                                        <li>mov eax, 1 → B8 01 00 00 00</li>
+                                        <li>add eax, 5 → 83 C0 05</li>
+                                        <li>ret → C3</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="architecture-info">
+                            <h4>Особливості архітектур:</h4>
+                            <ul>
+                                <li><strong>x86 (32-bit):</strong> Використовує 32-бітові регістри (eax, ebx, ecx, edx)</li>
+                                <li><strong>x64 (64-bit):</strong> Розширені 64-бітові регістри (rax, rbx, rcx, rdx) з додатковими префіксами</li>
+                                <li><strong>ARM:</strong> RISC архітектура з регістрами r0-r15, інші команди повернення</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="input-group" v-if="conversionMode === 'toAssembly'">
+                    <label for="machine-code-input">Введіть машинний код (у шістнадцятковому форматі):</label>
+                    <textarea 
+                        id="machine-code-input" 
+                        v-model="machineCode" 
+                        :class="{ error: inputError }"
+                        placeholder="Наприклад: 8B 45 FC 83 C0 01 89 45 FC"
+                        rows="5"
+                    ></textarea>
+                    <span class="error-message" v-if="inputError">{{ errorMessage }}</span>
+                </div>
+                
+                <div class="input-group" v-if="conversionMode === 'toMachine'">
+                    <label for="assembly-input">Введіть код асемблера:</label>
+                    <textarea 
+                        id="assembly-input" 
+                        v-model="assemblyCode" 
+                        :class="{ error: inputError }"
+                        placeholder="Наприклад:
+mov eax, [ebp-4]
+add eax, 1
+mov [ebp-4], eax"
+                        rows="5"
+                    ></textarea>
+                    <span class="error-message" v-if="inputError">{{ errorMessage }}</span>
+                </div>
+                
+                <div class="architecture-selector">
+                    <label for="architecture-select">Архітектура процесора:</label>
+                    <select id="architecture-select" v-model="architecture" class="system-select">
+                        <option value="x86">x86 (32-bit)</option>
+                        <option value="x64">x64 (64-bit)</option>
+                        <option value="arm">ARM</option>
+                    </select>
+                </div>
+                
+                <button class="convert-btn" @click="convertCode">Конвертувати</button>
+				
+				<div class="result-section" v-if="hasResults">
+					<h3>Результат конвертації</h3>
+                
+					<div class="result-container">
+						<h4>{{ conversionMode === 'toAssembly' ? 'Асемблерний код:' : 'Машинний код:' }}</h4>
+						<pre class="code-result">{{ conversionResult }}</pre>
+						<button class="copy-btn" @click="copyToClipboard">Копіювати в буфер обміну</button>
+					</div>
+				</div>
+            
+				<div class="explanation-section" v-if="showExplanation">
+					<h3>Пояснення конвертації</h3>
+					<div class="instruction-table" v-if="instructions.length > 0">
+						<table>
+							<thead>
+								<tr>
+									<th>Машинний код</th>
+									<th>Асемблерна інструкція</th>
+									<th>Пояснення</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="(instr, index) in instructions" :key="index">
+									<td class="machine-code-cell">{{ instr.machineCode }}</td>
+									<td class="assembly-cell">{{ instr.assembly }}</td>
+									<td class="explanation-cell">{{ instr.explanation }}</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>© 2025 Віртуальна лабораторія. Всі права захищені.</p>
+    </footer>
+    <script>
+        const { createApp } = Vue;
+        const app = createApp({
+            data() {
+                return {
+                    conversionMode: 'toAssembly', // 'toAssembly' або 'toMachine'
+                    machineCode: '',
+                    assemblyCode: '',
+                    architecture: 'x86',
+                    inputError: false,
+                    errorMessage: '',
+                    hasResults: false,
+                    showExplanation: false,
+                    showHelp: false,
+                    conversionResult: '',
+                    instructions: [],
+                    copied: false
+                }
+            },
+            methods: {
+                validateInput() {
+                    this.inputError = false;
+                    this.errorMessage = '';
+                    
+                    if (this.conversionMode === 'toAssembly') {
+                        if (!this.machineCode.trim()) {
+                            this.inputError = true;
+                            this.errorMessage = 'Будь ласка, введіть машинний код';
+                            return false;
+                        }
+                        
+                        // Перевірка на правильний формат шістнадцяткового коду
+                        const hexPattern = /^([0-9A-Fa-f]{2}\s?)+$/;
+                        if (!hexPattern.test(this.machineCode.trim())) {
+                            this.inputError = true;
+                            this.errorMessage = 'Неправильний формат машинного коду. Використовуйте шістнадцятковий формат (наприклад: 8B 45 FC)';
+                            return false;
+                        }
+                    } else {
+                        if (!this.assemblyCode.trim()) {
+                            this.inputError = true;
+                            this.errorMessage = 'Будь ласка, введіть код асемблера';
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                },
+                
+                convertCode() {
+                    if (!this.validateInput()) {
+                        this.hasResults = false;
+                        this.showExplanation = false;
+                        return;
+                    }
+                    
+                    if (this.conversionMode === 'toAssembly') {
+                        this.convertMachineCodeToAssembly();
+                    } else {
+                        this.convertAssemblyToMachineCode();
+                    }
+                    
+                    this.hasResults = true;
+                    this.showExplanation = true;
+                },
+                
+                convertMachineCodeToAssembly() {
+                    // Демонстраційна логіка конвертації машинного коду в асемблер
+                    const machineCodeBytes = this.machineCode.trim().split(/\s+/);
+                    
+                    // Приклад демонстраційної конвертації
+                    const demoConversions = {
+                        '8B45FC': { asm: 'mov eax, [ebp-4]', explanation: 'Завантаження значення зі стеку в регістр EAX' },
+                        '83C001': { asm: 'add eax, 1', explanation: 'Додавання 1 до регістру EAX' },
+                        '8945FC': { asm: 'mov [ebp-4], eax', explanation: 'Збереження значення з регістру EAX назад у стек' },
+                        'B801000000': { asm: 'mov eax, 1', explanation: 'Встановлення значення 1 в регістр EAX' },
+                        '50': { asm: 'push eax', explanation: 'Відправка значення EAX на вершину стеку' },
+                        '5B': { asm: 'pop ebx', explanation: 'Зняття значення з вершини стеку в регістр EBX' },
+                        'E8': { asm: 'call', explanation: 'Виклик підпрограми за відносною адресою' },
+                        'C3': { asm: 'ret', explanation: 'Повернення з процедури' }
+                    };
+                    
+                    let result = '';
+                    this.instructions = [];
+                    
+                    // Спрощений парсинг для демонстрації
+                    let i = 0;
+                    while (i < machineCodeBytes.length) {
+                        // Перевіряємо різні комбінації байтів
+                        let found = false;
+                        for (let len = Math.min(5, machineCodeBytes.length - i); len > 0; len--) {
+                            const chunk = machineCodeBytes.slice(i, i + len).join('').toUpperCase();
+                            if (demoConversions[chunk]) {
+                                const byteCode = machineCodeBytes.slice(i, i + len).join(' ');
+                                result += demoConversions[chunk].asm + '\n';
+                                this.instructions.push({
+                                    machineCode: byteCode,
+                                    assembly: demoConversions[chunk].asm,
+                                    explanation: demoConversions[chunk].explanation
+                                });
+                                i += len;
+                                found = true;
+                                break;
+                            }
+                        }
+                        
+                        // Якщо комбінацію не знайдено, додаємо як невідому інструкцію
+                        if (!found) {
+                            result += `DB ${machineCodeBytes[i]} ; Невідома інструкція\n`;
+                            this.instructions.push({
+                                machineCode: machineCodeBytes[i],
+                                assembly: `DB ${machineCodeBytes[i]}`,
+                                explanation: 'Невідома інструкція'
+                            });
+                            i++;
+                        }
+                    }
+                    
+                    this.conversionResult = result.trim();
+                },
+                
+                convertAssemblyToMachineCode() {
+                    const assemblyLines = this.assemblyCode.trim().split('\n');
+                    this.instructions = [];
+                    let result = '';
+
+                    // Таблиці інструкцій для різних архітектур
+                    const instructionSets = {
+                        x86: {
+                            'mov': {
+                                'eax, [ebp-4]': { code: '8B 45 FC', explanation: 'Завантаження значення зі стеку (ebp-4) в регістр EAX' },
+                                '[ebp-4], eax': { code: '89 45 FC', explanation: 'Збереження значення з EAX у стек (ebp-4)' },
+                                'eax, ebx': { code: '89 D8', explanation: 'Копіювання значення з EBX в EAX' },
+                                'ebx, eax': { code: '89 C3', explanation: 'Копіювання значення з EAX в EBX' },
+                                'eax, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(8, '0').toUpperCase();
+                                    return { code: `B8 ${hex.match(/.{2}/g).join(' ')}`, explanation: `Завантаження константи ${value} в EAX` };
+                                },
+                                'ebx, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(8, '0').toUpperCase();
+                                    return { code: `BB ${hex.match(/.{2}/g).join(' ')}`, explanation: `Завантаження константи ${value} в EBX` };
+                                }
+                            },
+                            'add': {
+                                'eax, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `83 C0 ${hex}`, explanation: `Додавання константи ${value} до EAX` };
+                                },
+                                'eax, ebx': { code: '03 C3', explanation: 'Додавання значення EBX до EAX' }
+                            },
+                            'sub': {
+                                'eax, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `83 E8 ${hex}`, explanation: `Віднімання константи ${value} від EAX` };
+                                },
+                                'eax, ebx': { code: '2B C3', explanation: 'Віднімання значення EBX від EAX' }
+                            },
+                            'push': {
+                                'eax': { code: '50', explanation: 'Відправка значення EAX на вершину стеку' },
+                                'ebx': { code: '53', explanation: 'Відправка значення EBX на вершину стеку' }
+                            },
+                            'pop': {
+                                'eax': { code: '58', explanation: 'Зняття значення зі стеку в EAX' },
+                                'ebx': { code: '5B', explanation: 'Зняття значення зі стеку в EBX' }
+                            },
+                            'ret': {
+                                '': { code: 'C3', explanation: 'Повернення з процедури' }
+                            }
+                        },
+                        x64: {
+                            'mov': {
+                                'rax, [rbp-8]': { code: '48 8B 45 F8', explanation: 'Завантаження 64-бітового значення зі стеку (rbp-8) в регістр RAX' },
+                                '[rbp-8], rax': { code: '48 89 45 F8', explanation: 'Збереження значення з RAX у стек (rbp-8)' },
+                                'rax, rbx': { code: '48 89 D8', explanation: 'Копіювання значення з RBX в RAX' },
+                                'rbx, rax': { code: '48 89 C3', explanation: 'Копіювання значення з RAX в RBX' },
+                                'rax, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(8, '0').toUpperCase();
+                                    return { code: `48 C7 C0 ${hex.match(/.{2}/g).join(' ')}`, explanation: `Завантаження константи ${value} в RAX` };
+                                },
+                                'rbx, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(8, '0').toUpperCase();
+                                    return { code: `48 C7 C3 ${hex.match(/.{2}/g).join(' ')}`, explanation: `Завантаження константи ${value} в RBX` };
+                                }
+                            },
+                            'add': {
+                                'rax, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `48 83 C0 ${hex}`, explanation: `Додавання константи ${value} до RAX` };
+                                },
+                                'rax, rbx': { code: '48 03 C3', explanation: 'Додавання значення RBX до RAX' }
+                            },
+                            'sub': {
+                                'rax, imm32': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `48 83 E8 ${hex}`, explanation: `Віднімання константи ${value} від RAX` };
+                                },
+                                'rax, rbx': { code: '48 2B C3', explanation: 'Віднімання значення RBX від RAX' }
+                            },
+                            'push': {
+                                'rax': { code: '50', explanation: 'Відправка значення RAX на вершину стеку' },
+                                'rbx': { code: '53', explanation: 'Відправка значення RBX на вершину стеку' }
+                            },
+                            'pop': {
+                                'rax': { code: '58', explanation: 'Зняття значення зі стеку в RAX' },
+                                'rbx': { code: '5B', explanation: 'Зняття значення зі стеку в RBX' }
+                            },
+                            'ret': {
+                                '': { code: 'C3', explanation: 'Повернення з процедури' }
+                            }
+                        },
+                        arm: {
+                            'mov': {
+                                'r0, [sp]': { code: 'E8 BD 00 01', explanation: 'Завантаження значення зі стеку в регістр R0' },
+                                '[sp], r0': { code: 'E8 8D 00 01', explanation: 'Збереження значення з R0 у стек' },
+                                'r0, r1': { code: 'E1 A0 00 01', explanation: 'Копіювання значення з R1 в R0' },
+                                'r1, r0': { code: 'E1 A0 10 00', explanation: 'Копіювання значення з R0 в R1' },
+                                'r0, #imm': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `E3 A0 00 ${hex}`, explanation: `Завантаження константи ${value} в R0` };
+                                },
+                                'r1, #imm': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `E3 A0 10 ${hex}`, explanation: `Завантаження константи ${value} в R1` };
+                                }
+                            },
+                            'add': {
+                                'r0, #imm': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `E2 80 00 ${hex}`, explanation: `Додавання константи ${value} до R0` };
+                                },
+                                'r0, r1': { code: 'E0 80 00 01', explanation: 'Додавання значення R1 до R0' }
+                            },
+                            'sub': {
+                                'r0, #imm': (value) => {
+                                    const hex = parseInt(value).toString(16).padStart(2, '0').toUpperCase();
+                                    return { code: `E2 40 00 ${hex}`, explanation: `Віднімання константи ${value} від R0` };
+                                },
+                                'r0, r1': { code: 'E0 40 00 01', explanation: 'Віднімання значення R1 від R0' }
+                            },
+                            'push': {
+                                'r0': { code: 'E9 2D 00 01', explanation: 'Відправка значення R0 на вершину стеку' },
+                                'r1': { code: 'E9 2D 00 02', explanation: 'Відправка значення R1 на вершину стеку' }
+                            },
+                            'pop': {
+                                'r0': { code: 'E8 BD 00 01', explanation: 'Зняття значення зі стеку в R0' },
+                                'r1': { code: 'E8 BD 00 02', explanation: 'Зняття значення зі стеку в R1' }
+                            },
+                            'bx lr': {
+                                '': { code: 'E1 2F FF 1E', explanation: 'Повернення з процедури' }
+                            }
+                        }
+                    };
+
+                    // Вибираємо набір інструкцій залежно від архітектури
+                    const instructionSet = instructionSets[this.architecture] || instructionSets.x86;
+
+                    for (const line of assemblyLines) {
+                        const trimmedLine = line.trim().toLowerCase();
+                        if (!trimmedLine) continue;
+
+                        // Розбиваємо рядок на команду та операнди
+                        let [instruction, ...operands] = trimmedLine.split(/[\s,]+/).filter(Boolean);
+                        let operandStr = operands.join(', ');
+
+                        // Для ARM: спеціальна обробка 'bx lr'
+                        if (this.architecture === 'arm' && trimmedLine === 'bx lr') {
+                            instruction = 'bx lr';
+                            operandStr = '';
+                            operands = [];
+                        }
+
+                        let found = false;
+
+                        // Перевіряємо, чи є команда в наборі інструкцій
+                        if (instructionSet[instruction]) {
+                            const patterns = instructionSet[instruction];
+
+                            // Перевіряємо точний збіг операндів
+                            if (patterns[operandStr]) {
+                                const { code, explanation } = patterns[operandStr];
+                                result += code + '\n';
+                                this.instructions.push({
+                                    machineCode: code,
+                                    assembly: trimmedLine,
+                                    explanation
+                                });
+                                found = true;
+                            } else {
+                                // Перевіряємо команди з негайними значеннями
+                                if ((instruction === 'mov' || instruction === 'add' || instruction === 'sub') && operands.length === 2) {
+                                    const [dest, value] = operands;
+                                    const immKey = this.architecture === 'arm' ? `${dest}, #imm` : `${dest}, imm32`;
+                                    const validDests = this.architecture === 'x86' ? ['eax', 'ebx'] :
+                                                      this.architecture === 'x64' ? ['rax', 'rbx'] : ['r0', 'r1'];
+                                    if (validDests.includes(dest) && !isNaN(parseInt(value))) {
+                                        if (patterns[immKey]) {
+                                            const { code, explanation } = patterns[immKey](value);
+                                            result += code + '\n';
+                                            this.instructions.push({
+                                                machineCode: code,
+                                                assembly: trimmedLine,
+                                                explanation
+                                            });
+                                            found = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Якщо команда не розпізнана
+                        if (!found) {
+                            result += '?? ?? ?? ; Невідома інструкція\n';
+                            this.instructions.push({
+                                machineCode: '?? ?? ??',
+                                assembly: trimmedLine,
+                                explanation: 'Невідома інструкція або непідтримуваний формат'
+                            });
+                        }
+                    }
+
+                    this.conversionResult = result.trim();
+                },
+                
+                copyToClipboard() {
+                    navigator.clipboard.writeText(this.conversionResult)
+                        .then(() => {
+                            this.copied = true;
+                            setTimeout(() => {
+                                this.copied = false;
+                            }, 2000);
+                            alert('Скопійовано в буфер обміну!');
+                        })
+                        .catch(err => {
+                            console.error('Помилка при копіюванні: ', err);
+                            alert('Не вдалося скопіювати в буфер обміну');
+                        });
+                }
+            }
+        });
+        app.mount('#app');
+    </script>
+    
+    <style>
+        .top-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+        
+        .conversion-mode {
+            flex: 1;
+        }
+        
+        .help-btn {
+            background: #4CAF50;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .help-section {
+            border: 1px solid #e0e6ed;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .help-section h3 {
+            color: #2d3748;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .help-content {
+            color: #4a5568;
+        }
+        
+        .help-mode h4 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .help-mode ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .help-mode li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        
+        .help-mode ul ul {
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .help-mode ul ul li {
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .architecture-info {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .architecture-info h4 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .architecture-info ul {
+            margin-left: 20px;
+        }
+        
+        .architecture-info li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        
+        @media (max-width: 768px) {
+            .top-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .help-btn {
+                margin-top: 15px;
+                text-align: center;
+            }
+        }

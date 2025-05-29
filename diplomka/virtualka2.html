@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+
+<html lang="uk">
+<head>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <title>Віртуальна лабораторія</title>
+    <link rel="stylesheet" href="style2.css">
+    <!-- Підключаємо Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <header>
+        <h1 onclick="window.location.href='main.html'">Віртуальна лабораторія "Периферійні пристрої"</h1>
+    </header>
+    <main>
+        <div id="app">
+            <div id="side-panel">
+                <!-- Список компонентів -->
+                <div v-for="component in components" :key="component.name" 
+                    class="component"
+                    @click="handleComponentClick(component)">
+                    {{ component.name }}
+                    <img :src="component.icon" :alt="component.name">
+                </div>
+            </div>
+            <div id="lab-container">
+                <canvas id="lab-canvas" width="1500" height="600" 
+                    @mousedown="handleMouseDown" 
+                    @mousemove="onMouseMove" 
+                    @mouseup="stopDrag"
+                    @contextmenu.prevent="showContextMenu"></canvas>
+
+                <!-- Контекстне меню -->
+                <div v-if="contextMenu.visible"
+                    class="context-menu"
+                    :style="{ left: (contextMenu.x - 250) + 'px', top: (contextMenu.y - 160) + 'px' }">
+                    <div class="context-menu-item" @click="deleteComponent">Видалити</div>
+                    <div v-if="isMonitor" class="context-menu-item" @click="flipMonitor">Перевернути</div>
+                    <div class="context-menu-item" @click="showHowItWorks">Як працює</div>
+                    <div v-if="isKeyboardOrMouse" class="context-menu-item" @click="showCleaningVideo">Чистка пристрою</div>
+                </div>
+            </div>
+            
+            <!-- Відео-панель допомоги "Як працює" -->
+            <div class="video-help-panel" :class="{ visible: videoHelp.visible }">
+                <div class="video-help-header">
+                    <h2>{{ videoHelp.title }}</h2>
+                    <button class="close-video-btn" @click="closeVideoHelp">×</button>
+                </div>
+                <div class="video-container">
+                    <iframe v-if="videoHelp.src" 
+        :src="videoHelp.src" 
+        width="360" 
+        height="215" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+        allowfullscreen></iframe>
+                    <div class="video-description">
+                        {{ videoHelp.description }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Діалог вибору маніпулятора -->
+            <div v-if="manipulatorDialog.visible" class="manufacturer-dialog">
+                <div class="manufacturer-dialog-content">
+                    <h2>Виберіть тип маніпулятора</h2>
+                    <div class="manufacturer-buttons">
+                        <button class="manufacturer-button red" @click="selectManipulator('mouse')">Миша</button>
+                        <button class="manufacturer-button blue" @click="selectManipulator('gamepad')">Геймпад</button>
+                        <button class="manufacturer-button green" @click="selectManipulator('joystick')">Джойстик</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Діалог зміни розміру -->
+            <div v-if="resizeDialog.visible" class="resize-dialog">
+                <div class="resize-dialog-content">
+                    <h3>Змінити розмір монітора</h3>
+                    <div class="resize-input-group">
+                        <label for="width">Ширина:</label>
+                        <input type="number" id="width" v-model.number="resizeDialog.width" min="100" max="800">
+                    </div>
+                    <div class="resize-input-group">
+                        <label for="height">Висота:</label>
+                        <input type="number" id="height" v-model.number="resizeDialog.height" min="100" max="600">
+                    </div>
+                    <div class="resize-buttons">
+                        <button @click="applyResize">Застосувати</button>
+                        <button @click="cancelResize">Скасувати</button>
+                    </div>
+                </div>
+            </div>
+                
+            <!-- Повідомлення про зону клавіатури -->
+            <div v-if="keyboardMessage.visible" class="keyboard-message" 
+                :class="keyboardMessage.class"
+                :style="{left: (keyboardMessage.x - 20) + 'px', top: (keyboardMessage.y - 150) + 'px'}">
+                {{ keyboardMessage.text }}
+            </div>
+            
+            <!-- Відображення координат -->
+            <div class="coordinates-display">
+                X: {{ mouseX }}, Y: {{ mouseY }}
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>© 2025 Віртуальна лабораторія. Всі права захищені.</p>
+    </footer>
+    <script>
+        const { createApp } = Vue;
+        const app = createApp({
+            data() {
+                return {
+                    components: [
+                        { 
+                            name: 'Клавіатура', 
+                            icon: 'assets/keyboard.png', 
+                            imageOnCanvas: 'assets/alt/keyboard.png', 
+                            defaultWidth: 700, 
+                            defaultHeight: 200, 
+                            type: 'keyboard', 
+                            limit: 0, 
+                            needsManufacturer: false,
+                            helpVideo: 'videos/keyboard_help.mp4',
+                            helpDescription: 'Клавіатура - пристрій для введення інформації. Складається з клавіш для введення символів та управління комп\'ютером.',
+                            cleaningVideo: 'videos/keyboard_cleaning.mp4',
+                            cleaningDescription: 'Правильна чистка клавіатури подовжує термін її служби та забезпечує гігієнічне використання. Дотримуйтесь рекомендацій для різних типів клавіатур.',
+                            zones: [
+                                {
+                                    name: 'pink',
+                                    shape: 'poly',
+                                    coords: [0, 0, 425, 0, 425, 40, 0, 40],
+                                    message: 'Зона функціональних клавіш, що виконують спеціальні команди'
+                                },
+                                {
+                                    name: 'red',
+                                    shape: 'poly',
+                                    coords: [0, 60, 415, 60, 415, 190, 0, 190],
+                                    message: 'Зона цифро-літерна зона, які відповідають за друк'
+                                },
+                                {
+                                    name: 'blue',
+                                    shape: 'rect',
+                                    coords: [445, 145, 525, 190],
+                                    message: 'Зона управління курсором'
+                                },
+                                {
+                                    name: 'purple',
+                                    shape: 'rect',
+                                    coords: [555, 70, 665, 190],
+                                    message: 'Цифрова клавіатура, зручна для введення чисел і математичних операцій'
+                                },
+                                {
+                                    name: 'yellow',
+                                    shape: 'rect',
+                                    coords: [445, 70, 525, 130],
+                                    message: 'Клавіші управління, допомагають редагувати текст і переміщатись у документа'
+                                },
+                                {
+                                    name: 'green',
+                                    shape: 'rect',
+                                    coords: [555, 0, 665, 40],
+                                    message: 'Індикатори, відображають стани декотрих клавіш (CapsLock, NumLock, ScrollLock)'
+                                }
+                            ]
+                        },
+                        { 
+                            name: 'Маніпулятори', 
+                            icon: 'assets/mouse.png',
+                            type: 'manipulator_category',
+                            showSubMenu: true
+                        },
+                        { 
+                            name: 'Монітор', 
+                            icon: 'assets/monitor.png', 
+                            imageOnCanvas: 'assets/alt/monitorFRONT.png',
+                            imageFlipped: 'assets/alt/monitorBACK.png',
+                            isFlipped: false,
+                            defaultWidth: 650, 
+                            defaultHeight: 400,
+                            flippedWidth: 900,
+                            flippedHeight: 200,
+                            type: 'monitor', 
+                            limit: 0, 
+                            needsManufacturer: false,
+                            helpVideo: 'videos/monitor_help.mp4',
+                            helpDescription: 'Монітор - пристрій виведення візуальної інформації. Має різні роз\'єми для підключення та налаштування.',
+                            zones: [
+                                {
+                                    name: 'cyan',
+                                    shape: 'rect',
+                                    coords: [170, 150, 270, 250],
+                                    message: 'Роз\'єм живлення від зовнішнього блока живлення'
+                                },
+                                {
+                                    name: 'yellow',
+                                    shape: 'rect',
+                                    coords: [530, 190, 600, 210],
+                                    message: 'Роз\'єми HDMI. Він має змогу передавати відео та звук. Підтримують Full HD при високій частоті (до 165 Гц)'
+                                },
+                                {
+                                    name: 'red',
+                                    shape: 'rect',
+                                    coords: [600, 190, 635, 210],
+                                    message: 'Роз\'єм display port. Теж для відео й звуку, дає стабільні 180 Гц'
+                                },
+                                {
+                                    name: 'blue',
+                                    shape: 'rect',
+                                    coords: [635, 190, 650, 210],
+                                    message: 'Роз\'єм для навушників 3.5 міліметра'
+                                }
+                            ]
+                        },
+                    ],
+                    // Визначення кожного типу маніпулятора окремо
+                    manipulators: {
+                        mouse: { 
+                            name: 'Миша', 
+                            icon: 'assets/mouse.png', 
+                            imageOnCanvas: 'assets/alt/mouse.png', 
+                            defaultWidth: 200, 
+                            defaultHeight: 300, 
+                            type: 'mouse', 
+                            limit: 0, 
+                            needsManufacturer: false,
+                            helpVideo: 'videos/mouse_help.mp4',
+                            helpDescription: 'Миша - пристрій введення, який дозволяє керувати курсором на екрані. Має кнопки та колесо прокрутки.',
+                            cleaningVideo: 'videos/mouse_cleaning.mp4',
+                            cleaningDescription: 'Регулярна чистка миші допомагає підтримувати точність руху курсора та уникнути накопичення бруду. Необхідно особливу увагу приділити колесу прокрутки та сенсору.',
+                            zones: [
+                                {
+                                    name: 'pink',
+                                    shape: 'rect',
+                                    coords: [0, 0, 80, 230],
+                                    message: 'Ліва кнопка миші, основна кнопка для вибору, натискань і перетягування.'
+                                },
+								{
+                                    name: 'pink',
+                                    shape: 'rect',
+                                    coords: [130, 0, 210, 230],
+                                    message: 'Права кнопка миші, зазвичай використовується для відкриття контекстного меню.'
+                                },
+                                {
+                                    name: 'blue',
+                                    shape: 'rect',
+                                    coords: [75, 150, 125, 200],
+                                    message: 'Клавіші для зміни DPI'
+                                },
+                                {
+                                    name: 'yellow',
+                                    shape: 'rect',
+                                    coords: [50, 50, 115, 150],
+                                    message: 'Колесико миші'
+                                }
+                            ]
+                        },
+                        gamepad: { 
+							name: 'Геймпад', 
+							icon: 'assets/gamepad.png', 
+							imageOnCanvas: 'assets/alt/gamepad.png', 
+							defaultWidth: 400, 
+							defaultHeight: 250, 
+							type: 'gamepad', 
+							limit: 0, 
+							needsManufacturer: false,
+							helpVideo: 'videos/gamepad_help.mp4',
+							helpDescription: 'Геймпад - ігровий контролер для зручного керування в іграх. Має стіки, кнопки та тригери.',
+							zones: [
+								{
+									name: 'red',
+									shape: 'rect',
+									coords: [30, 30, 75, 75],
+									message: 'Хрестовина (D-pad): для навігації в меню та вибору дій у грі'
+								},
+								{
+									name: 'pink',
+									shape: 'rect',
+									coords: [30, 70, 110, 110],
+									message: 'Лівий стік: рух персонажа, натискання – кнопка L3'
+								},
+								{
+									name: 'blue',
+									shape: 'rect',
+									coords: [140, 70, 190, 110],
+									message: 'Правий стік: керування камерою, натискання – кнопка R3'
+								},
+								{
+									name: 'yellow',
+									shape: 'rect',
+									coords: [50, 70, 130, 110],
+									message: 'Кнопка PS і мікрофон: PS відкриває меню, нижче – вимикач мікрофона'
+								},
+								{
+									name: 'green',
+									shape: 'rect',
+									coords: [0, 0, 230, 20],
+									message: 'Тригери L1/L2 і R1/R2: для стрільби, прицілювання, газу, гальма'
+								},
+								{
+									name: 'cyan',
+									shape: 'rect',
+									coords: [170, 20, 230, 70],
+									message: 'Кнопки дій (трикутник, коло, хрестик, квадрат): основні дії у грі, як-от стрибок, атака, підтвердження'
+								}
+							]
+						},
+                        joystick: { 
+                            name: 'Джойстик', 
+                            icon: 'assets/joystick.png', 
+                            imageOnCanvas: 'assets/alt/joystick.png', 
+                            defaultWidth: 350, 
+                            defaultHeight: 500, 
+                            type: 'joystick', 
+                            limit: 0, 
+                            needsManufacturer: false,
+                            helpVideo: 'videos/joystick_help.mp4',
+                            helpDescription: 'Джойстик - пристрій для керування в іграх. Має головну ручку для керування та кнопки для дій.',
+                            zones: [
+                                {
+                                    name: 'blue',
+                                    shape: 'rect',
+                                    coords: [120, 220, 180, 320],
+                                    message: 'Кнопки на основі: зліва і справа по 4 кнопки (X, Y, A, B) та по одній нижній допоміжній'
+                                },
+								{
+                                    name: 'blue',
+                                    shape: 'rect',
+                                    coords: [0, 220, 50, 320],
+                                    message: 'Кнопки на основі: зліва і справа по 4 кнопки (X, Y, A, B) та по одній нижній допоміжній'
+                                },
+                                {
+                                    name: 'red',
+                                    shape: 'rect',
+                                    coords: [60, 0, 120, 50],
+                                    message: 'Ручка: червона кнопка справа, чорна зліва, міні-джойстик по центру'
+                                },
+                                {
+                                    name: 'black',
+                                    shape: 'rect',
+                                    coords: [70, 300, 110, 350],
+                                    message: 'Регулятор тяги: повзунок внизу по центру'
+                                },
+                                {
+                                    name: 'yellow',
+                                    shape: 'rect',
+                                    coords: [60, 100, 120, 300],
+                                    message: 'Основа стика: механізм повороту ручки без кнопок'
+                                }
+                            ]
+                        }
+					},
+                    placedComponents: [],
+                    dragging: null,
+                    offsetX: 0,
+                    offsetY: 0,
+                    mouseX: 0,
+                    mouseY: 0,
+                    componentImages: {},
+                    contextMenu: {
+                        visible: false,
+                        x: 0,
+                        y: 0,
+                        targetComponent: null
+                    },
+                    keyboardMessage: {
+                        visible: false,
+                        text: '',
+                        class: '',
+                        x: 0,
+                        y: 0
+                    },
+                    resizeDialog: {
+                        visible: false,
+                        width: 500,
+                        height: 300,
+                        targetComponent: null
+                    },
+                    manipulatorDialog: {
+                        visible: false
+                    },
+                    // Нові дані для відео-панелі "Як працює"
+                    videoHelp: {
+                        visible: false,
+                        title: "",
+                        src: "",
+                        description: ""
+                    }
+                };
+            },
+            computed: {
+                // Обчислювана властивість, яка перевіряє, чи вибраний компонент є монітором
+                isMonitor() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const component = this.placedComponents[this.contextMenu.targetComponent];
+                        return component && component.type === 'monitor';
+                    }
+                    return false;
+                },
+                // Нова обчислювана властивість, яка перевіряє, чи вибраний компонент є клавіатурою або мишкою
+                isKeyboardOrMouse() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const component = this.placedComponents[this.contextMenu.targetComponent];
+                        return component && (component.type === 'keyboard' || component.type === 'mouse');
+                    }
+                    return false;
+                }
+            },
+            methods: {
+                // Новий метод для відображення відео про чистку пристрою
+                showCleaningVideo() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const component = this.placedComponents[this.contextMenu.targetComponent];
+
+                        let videoSrc = "";
+                        let videoTitle = "";
+                        let videoDesc = "";
+
+                        if (component) {
+                            switch(component.type) {
+                                case 'keyboard':
+                                    videoSrc = "https://www.youtube.com/embed/JeDdGcgibdg?si=RwfyC80_RK1R9pEw";
+                                    videoTitle = "Чистка клавіатури";
+                                    videoDesc = component.helpDescription || "Інформація про клавіатуру";
+                                    break;
+                                case 'mouse':
+                                    videoSrc = "https://www.youtube.com/embed/fMpeT4mPE30?si=3FK5Bto_lzNeNpWJ";
+                                    videoTitle = "Чистка миші";
+                                    videoDesc = component.helpDescription || "Інформація про мишу";
+                                    break;
+                                default:
+                                    videoSrc = "";
+                                    videoTitle = "Інформація недоступна";
+                                    videoDesc = "Для цього компонента немає відео-пояснення";
+                            }
+
+                            this.videoHelp = {
+                                visible: true,
+                                title: videoTitle,
+                                src: videoSrc,
+                                description: videoDesc
+                            };
+
+                            this.contextMenu.visible = false;
+                        }
+                    }
+                },
+                
+                // Метод для відображення відео-інструкції "Як працює"
+                showHowItWorks() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const component = this.placedComponents[this.contextMenu.targetComponent];
+
+                        let videoSrc = "";
+                        let videoTitle = "";
+                        let videoDesc = "";
+
+                        if (component) {
+                            switch(component.type) {
+                                case 'keyboard':
+                                    videoSrc = "https://www.youtube.com/embed/auK1_QwEAEE?si=pV8ib89NlRFtX-8J";
+                                    videoTitle = "Як працює клавіатура";
+                                    videoDesc = component.helpDescription || "Інформація про клавіатуру";
+                                    break;
+                                case 'monitor':
+                                    videoSrc = "https://www.youtube.com/embed/wRXlC1-0IZ8?si=mJwWXzopIvYU3snK";
+                                    videoTitle = "Як працює монітор";
+                                    videoDesc = component.helpDescription || "Інформація про монітор";
+                                    break;
+                                case 'mouse':
+                                    videoSrc = "https://www.youtube.com/embed/MXcAuQgxiTk?si=hu_tawZWn36SX3yd";
+                                    videoTitle = "Як працює миша";
+                                    videoDesc = component.helpDescription || "Інформація про мишу";
+                                    break;
+                                case 'gamepad':
+                                    videoSrc = "https://www.youtube.com/embed/uyfuZLHp8v0?si=QNueYafqPAxAbpt_";
+                                    videoTitle = "Як працює геймпад";
+                                    videoDesc = component.helpDescription || "Інформація про геймпад";
+                                    break;
+                                case 'joystick':
+                                    videoSrc = "https://www.youtube.com/embed/uyfuZLHp8v0?si=Ia0-ZygoWCGRcVx-";
+                                    videoTitle = "Як працює джойстик";
+                                    videoDesc = component.helpDescription || "Інформація про джойстик";
+                                    break;
+                                default:
+                                    videoSrc = "";
+                                    videoTitle = "Інформація недоступна";
+                                    videoDesc = "Для цього компонента немає відео-пояснення";
+                            }
+
+                            this.videoHelp = {
+                                visible: true,
+                                title: videoTitle,
+                                src: videoSrc,
+                                description: videoDesc
+                            };
+
+                            this.contextMenu.visible = false;
+                        }
+                    }
+                },
+                
+                    // Метод для закриття відео-панелі
+                closeVideoHelp() {
+                    // Отримуємо посилання на відео елемент
+                    const videoElement = document.querySelector('.video-container video');
+                    
+                    // Якщо відео елемент існує, зупиняємо його та скидаємо час
+                    if (videoElement) {
+                        videoElement.pause();
+                        videoElement.currentTime = 0;
+                        // Очищаємо src щоб повністю скинути відео
+                        videoElement.src = "";
+                        videoElement.load();
+                    }
+                    
+                    // Ховаємо панель та очищаємо інформацію про відео
+                    this.videoHelp = {
+                        visible: false,
+                        title: "",
+                        src: "",
+                        description: ""
+                    };
+                },
+                
+                // Оновлений метод для обробки кліків по компонентам
+                handleComponentClick(component) {
+                    if (component.showSubMenu) {
+                        if (component.type === 'manipulator_category') {
+                            this.manipulatorDialog.visible = true;
+                        }
+                    } else {
+                        this.addToCanvas(component);
+                    }
+                },
+                // Метод для вибору типу маніпулятора
+                selectManipulator(type) {
+                    const manipulator = this.manipulators[type];
+                    if (manipulator) {
+                        this.addToCanvas(manipulator);
+                    }
+                    this.manipulatorDialog.visible = false;
+                },
+                addToCanvas(component) {
+                    const imageToUse = component.imageOnCanvas || component.icon;
+                    
+                    const newComponent = {
+                        ...component,
+                        icon: component.icon,
+                        imageOnCanvas: imageToUse,
+                        x: 100,
+                        y: 100,
+                        width: component.defaultWidth || 130,
+                        height: component.defaultHeight || 120
+                    };
+                    
+                    this.preloadImage(imageToUse, () => {
+                        // Також попередньо завантажуємо альтернативне зображення для монітора
+                        if (component.type === 'monitor' && component.imageFlipped) {
+                            this.preloadImage(component.imageFlipped, () => {});
+                        }
+                        
+                        this.placedComponents.push(newComponent);
+                        this.drawCanvas();
+                    });
+                },
+                preloadImage(src, callback) {
+                    if (this.componentImages[src]) {
+                        callback();
+                        return;
+                    }
+                    const img = new Image();
+                    img.onload = () => {
+                        this.componentImages[src] = img;
+                        callback();
+                    };
+                    img.src = src;
+                },
+                drawCanvas() {
+                    const canvas = document.getElementById('lab-canvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    this.placedComponents.forEach((comp) => {
+                        const imageSrc = comp.imageOnCanvas;
+                        
+                        if (this.componentImages[imageSrc]) {
+                            ctx.drawImage(this.componentImages[imageSrc], comp.x, comp.y, comp.width, comp.height);
+                        } else {
+                            this.preloadImage(imageSrc, () => this.drawCanvas());
+                        }
+                    });
+                },
+                handleMouseDown(event) {
+                    this.contextMenu.visible = false;
+                    this.resizeDialog.visible = false;
+                    
+                    if (event.button === 0) {
+                        const isZoneClicked = this.checkComponentZones(event);
+                        
+                        if (!isZoneClicked) {
+                            this.startDrag(event);
+                        }
+                    }
+                },
+                checkComponentZones(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    
+                    for (let i = 0; i < this.placedComponents.length; i++) {
+                        const comp = this.placedComponents[i];
+                        
+                        if ((comp.type === 'keyboard' || comp.type === 'mouse' || comp.type === 'gamepad' || comp.type === 'joystick' || 
+                             (comp.type === 'monitor' && comp.isFlipped)) && comp.zones) {
+                            for (let j = 0; j < comp.zones.length; j++) {
+                                const zone = comp.zones[j];
+                                let isInZone = false;
+                                
+                                const scaledCoords = this.getScaledZoneCoords(zone.coords, comp);
+                                
+                                if (zone.shape === 'rect') {
+                                    isInZone = this.isPointInRect(canvasX, canvasY, scaledCoords);
+                                } else if (zone.shape === 'poly') {
+                                    isInZone = this.isPointInPolygon(canvasX, canvasY, scaledCoords);
+                                }
+                                
+                                if (isInZone) {
+                                    this.showKeyboardMessage(zone.name, zone.message, event.clientX, event.clientY);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    this.keyboardMessage.visible = false;
+                    return false;
+                },
+                getScaledZoneCoords(coords, component) {
+                    let scaleX, scaleY;
+                    
+                    if (component.type === 'keyboard') {
+                        scaleX = component.width / 665;
+                        scaleY = component.height / 190;
+                    } else if (component.type === 'mouse') {
+                        scaleX = component.width / 200;
+                        scaleY = component.height / 400;
+                    } else if (component.type === 'gamepad') {
+                        scaleX = component.width / 250;
+                        scaleY = component.height / 180;
+                    } else if (component.type === 'joystick') {
+                        scaleX = component.width / 180;
+                        scaleY = component.height / 400;
+                    } else if (component.type === 'monitor' && component.isFlipped) {
+                        scaleX = component.width / 900;
+                        scaleY = component.height / 400;
+                    }
+                    
+                    const scaledCoords = [];
+                    for (let i = 0; i < coords.length; i += 2) {
+                        scaledCoords.push(component.x + coords[i] * scaleX);
+                        scaledCoords.push(component.y + coords[i + 1] * scaleY);
+                    }
+                    
+                    return scaledCoords;
+                },
+                isPointInRect(x, y, coords) {
+                    return (x >= coords[0] && x <= coords[2] && y >= coords[1] && y <= coords[3]);
+                },
+                isPointInPolygon(x, y, coords) {
+                    let inside = false;
+                    for (let i = 0, j = coords.length - 2; i < coords.length; i += 2) {
+                        const xi = coords[i], yi = coords[i + 1];
+                        const xj = coords[j], yj = coords[j + 1];
+                        
+                        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                        if (intersect) inside = !inside;
+                        
+                        j = i;
+                    }
+                    
+                    return inside;
+                },
+               showKeyboardMessage(type, text, x, y) {
+                    this.keyboardMessage = {
+                        visible: true,
+                        text: text,
+                        class: type + '-message',
+                        x: x + 10,
+                        y: y + 10
+                    };
+                },
+                startDrag(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    for (let i = this.placedComponents.length - 1; i >= 0; i--) {
+                        const comp = this.placedComponents[i];
+                        if (canvasX >= comp.x && canvasX <= comp.x + comp.width && 
+                            canvasY >= comp.y && canvasY <= comp.y + comp.height) {
+                            this.dragging = i;
+                            this.offsetX = canvasX - comp.x;
+                            this.offsetY = canvasY - comp.y;
+                            break;
+                        }
+                    }
+                },
+                onMouseMove(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    
+                    this.mouseX = Math.round(canvasX);
+                    this.mouseY = Math.round(canvasY);
+                    
+                    if (this.dragging !== null) {
+                        this.placedComponents[this.dragging].x = canvasX - this.offsetX;
+                        this.placedComponents[this.dragging].y = canvasY - this.offsetY;
+                        requestAnimationFrame(() => this.drawCanvas());
+                    }
+                },
+                stopDrag() {
+                    this.dragging = null;
+                    this.drawCanvas();
+                },
+                showContextMenu(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    let targetComponent = null;
+                    for (let i = this.placedComponents.length - 1; i >= 0; i--) {
+                        const comp = this.placedComponents[i];
+                        if (canvasX >= comp.x && canvasX <= comp.x + comp.width && 
+                            canvasY >= comp.y && canvasY <= comp.y + comp.height) {
+                            targetComponent = i;
+                            break;
+                        }
+                    }
+                    if (targetComponent !== null) {
+                        let menuX = event.clientX + 10;
+                        let menuY = event.clientY + 10;
+
+                        const menuWidth = 150; // Збільшено ширину меню
+                        const menuHeight = 80; // Збільшено висоту для трьох пунктів
+                        const windowWidth = window.innerWidth;
+                        const windowHeight = window.innerHeight;
+
+                        if (menuX + menuWidth > windowWidth) {
+                            menuX = event.clientX - menuWidth - 10;
+                        }
+
+                        if (menuY + menuHeight > windowHeight) {
+                            menuY = event.clientY - menuHeight - 10;
+                        }
+
+                        this.contextMenu = {
+                            visible: true,
+                            x: menuX,
+                            y: menuY,
+                            targetComponent: targetComponent
+                        };
+                    }
+                },
+                deleteComponent() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        this.placedComponents.splice(this.contextMenu.targetComponent, 1);
+                        this.drawCanvas();
+                        this.contextMenu.visible = false;
+                    }
+                },
+                // Метод для перевертання монітора
+                flipMonitor() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const monitor = this.placedComponents[this.contextMenu.targetComponent];
+                        
+                        if (monitor.type === 'monitor') {
+                            // Перемикаємо стан монітора
+                            monitor.isFlipped = !monitor.isFlipped;
+                            
+                            // Змінюємо зображення та розміри залежно від стану
+                            if (monitor.isFlipped) {
+                                monitor.imageOnCanvas = monitor.imageFlipped;
+                                // Зберігаємо оригінальні розміри
+                                monitor.originalWidth = monitor.width;
+                                monitor.originalHeight = monitor.height;
+                                // Встановлюємо нові розміри для перевернутого зображення
+                                monitor.width = this.components.find(comp => comp.type === 'monitor').flippedWidth;
+                                monitor.height = this.components.find(comp => comp.type === 'monitor').flippedHeight;
+                            } else {
+                                monitor.imageOnCanvas = this.components.find(comp => comp.type === 'monitor').imageOnCanvas;
+                                // Відновлюємо оригінальні розміри
+                                if (monitor.originalWidth && monitor.originalHeight) {
+                                    monitor.width = monitor.originalWidth;
+                                    monitor.height = monitor.originalHeight;
+                                } else {
+                                    monitor.width = this.components.find(comp => comp.type === 'monitor').defaultWidth;
+                                    monitor.height = this.components.find(comp => comp.type === 'monitor').defaultHeight;
+                                }
+                            }
+                            
+                            // Оновлюємо полотно
+                            this.drawCanvas();
+                            this.contextMenu.visible = false;
+                        }
+                    }
+                },
+
+                openResizeDialog() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const monitor = this.placedComponents[this.contextMenu.targetComponent];
+                        
+                        if (monitor.type === 'monitor' && monitor.isFlipped) {
+                            this.resizeDialog = {
+                                visible: true,
+                                width: monitor.width,
+                                height: monitor.height,
+                                targetComponent: this.contextMenu.targetComponent
+                            };
+                            
+                            this.contextMenu.visible = false;
+                        }
+                    }
+                },
+                applyResize() {
+                    if (this.resizeDialog.targetComponent !== null) {
+                        const monitor = this.placedComponents[this.resizeDialog.targetComponent];
+                        
+                        // Встановлюємо нові розміри
+                        monitor.width = this.resizeDialog.width;
+                        monitor.height = this.resizeDialog.height;
+                        
+                        // Оновлюємо полотно
+                        this.drawCanvas();
+                        this.resizeDialog.visible = false;
+                    }
+                },
+                cancelResize() {
+                    this.resizeDialog.visible = false;
+                }
+            },
+            mounted() {
+                this.drawCanvas();
+                document.addEventListener('click', (event) => {
+                    if (this.contextMenu.visible && !event.target.closest('#lab-canvas') && !event.target.closest('.context-menu')) {
+                        this.contextMenu.visible = false;
+                    }
+                    
+                    if (this.keyboardMessage.visible && !event.target.closest('#lab-canvas')) {
+                        this.keyboardMessage.visible = false;
+                    }
+                    
+                    // Закриваємо діалог зміни розміру при кліку за його межами
+                    if (this.resizeDialog.visible && !event.target.closest('.resize-dialog-content') && !event.target.closest('.context-menu-item')) {
+                        this.resizeDialog.visible = false;
+                    }
+                });
+            }
+        });
+        app.mount('#app');
+    </script>
+</body>
+</html>

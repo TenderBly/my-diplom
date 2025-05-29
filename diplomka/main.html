@@ -9,14 +9,13 @@
 </head>
 <body>
     <header>
-        <h1>Віртуальна лабораторія з архітектури комп'ютера</h1>
+        <h1 onclick="window.location.href='main.html'">Віртуальна лабораторія з архітектури комп'ютера</h1>
         <div class="header-buttons">
-            <button class="header-btn tutorial-btn" id="tutorialBtn">Відео-туторіал</button>
+            <button class="header-btn tutorial-btn" id="tutorialBtn">Відео-інструкція</button>
             <button class="header-btn" id="aboutBtn">Про нас</button>
         </div>
     </header>
     
-    <!-- Модальне вікно "Про нас" -->
     <div id="aboutModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" id="closeAboutBtn">&times;</span>
@@ -31,12 +30,11 @@
     <div id="tutorialModal" class="modal">
         <div class="modal-content video-modal-content">
             <span class="close-btn" id="closeTutorialBtn">&times;</span>
-            <h3>Відео-туторіал з використання лабораторії</h3>
+            <h3>Відео-інструкція з використання лабораторії</h3>
             <div class="video-container">
-                <!-- Тут можна замінити на посилання на своє відео (YouTube, або локальне) -->
                 <iframe 
-                    src="videos/tutorial.mp4" 
-                    title="Туторіал з використання лабораторії" 
+                    src="https://www.youtube.com/embed/bQRVyGobMy8?si=i43Kys6X7rj52T_i" 
+                    title="Інструкція з використання лабораторії" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                     allowfullscreen>
                 </iframe>
@@ -100,7 +98,9 @@
             </div>
         </div>
     </div>
-    
+    <footer>
+        <p>© 2025 Віртуальна лабораторія. Всі права захищені.</p>
+    </footer>
     <script>
         // Отримання елементів модальних вікон
         const aboutModal = document.getElementById("aboutModal");

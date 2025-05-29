@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <title>Віртуальна лабораторія</title>
+    <link rel="stylesheet" href="style1.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <header>
+        <h1 onclick="window.location.href='main.html'">Віртуальна лабораторія "Компоненти комп'ютера"</h1>
+    </header>
+    <main>
+        <div id="app">
+            <div id="side-panel">
+                <div id="checklist">
+                    <h3>Статус компонентів</h3>
+                    <ul>
+                        <li :class="{ completed: isComponentPlaced('motherboard') }">
+                            Материнська плата: {{ isComponentPlaced('motherboard') ? '✓' : '✗' }}
+                        </li>
+                        <li :class="{ completed: isComponentPlaced('cpu') && cpuInSocket }">
+                            Процесор: {{ isComponentPlaced('cpu') ? (cpuInSocket ? '✓ (у сокеті)' : '✗ (не в сокеті)') : '✗' }}
+                        </li>
+                        <li :class="{ completed: isComponentPlaced('ram') && ramInSlots }">
+                            Оперативна пам’ять: {{ isComponentPlaced('ram') ? (ramInSlots ? '✓ (у слотах)' : '✗ (не в слотах)') : '✗' }}
+                        </li>
+                        <li :class="{ completed: isComponentPlaced('gpu') && gpuInSlot }">
+                            Відеокарта: {{ isComponentPlaced('gpu') ? (gpuInSlot ? '✓ (у слоті)' : '✗ (не в слоті)') : '✗' }}
+                        </li>
+                        <li :class="{ completed: isComponentPlaced('ssd') && ssdInSlot }">
+                            SSD M.2: {{ isComponentPlaced('ssd') ? (ssdInSlot ? '✓ (у слоті)' : '✗ (не в слоті)') : '✗' }}
+                        </li>
+                        <li :class="{ completed: isComponentPlaced('power') }">
+                            Живлення: {{ isComponentPlaced('power') ? '✓' : '✗' }}
+                        </li>
+                    </ul>
+                </div>
+                <div v-for="component in components" :key="component.name" 
+                    class="component" 
+                    :class="{ disabled: isComponentLimitReached(component.type) || isComponentDisabled(component) }"
+                    @click="selectComponent(component)">
+                    {{ component.name }}
+                    <img :src="component.icon" :alt="component.name">
+                    <span class="component-counter" v-if="component.limit > 0">
+                        {{ getComponentCount(component.type) }}/{{ component.limit }}
+                    </span>
+                </div>
+            </div>
+            <div id="lab-container">
+                <canvas id="lab-canvas" width="1400" height="800" 
+                    @mousedown="handleMouseDown" 
+                    @mousemove="onMouseMove" 
+                    @mouseup="stopDrag"
+                    @contextmenu.prevent="showContextMenu"></canvas>
+                <div v-if="contextMenu.visible" class="context-menu" 
+                    :style="{left: contextMenu.x + 'px', top: contextMenu.y + 'px'}">
+                    <div class="context-menu-item" @click="deleteComponent">Видалити</div>
+                    <div v-if="contextMenu.isSsd" class="context-menu-item" @click="rotateSsd">Повернути</div>
+                    <div class="context-menu-item" @click="showDetails">Подробиці</div>
+                </div>
+                <div v-if="notification.visible" class="notification" @click="hideNotification">
+                    {{ notification.message }}
+                </div>
+                <div v-if="manufacturerDialog.visible && manufacturerDialog.component" class="manufacturer-dialog">
+                    <div class="manufacturer-dialog-content">
+                        <h3>Виберіть виробника для {{ manufacturerDialog.component.name || 'компонента' }}</h3>
+                        <div class="manufacturer-options">
+                            <template v-if="manufacturerDialog.component.type === 'motherboard'">
+                                <template v-for="manufacturer in manufacturerDialog.component.manufacturers" :key="manufacturer">
+                                    <div>
+                                        <h4>{{ manufacturer }}</h4>
+                                        <button v-for="model in manufacturerDialog.component.models[manufacturer]" :key="model.name"
+                                            class="manufacturer-button" :class="getManufacturerClass(manufacturer)"
+                                            @click="selectModel(manufacturer, model)">
+                                            {{ model.name }} (Socket: {{ model.socket }})
+                                        </button>
+                                    </div>
+                                </template>
+                            </template>
+                            <template v-else-if="manufacturerDialog.component.type === 'cpu'">
+                                <template v-for="manufacturer in manufacturerDialog.component.manufacturers" :key="manufacturer">
+                                    <div>
+                                        <h4>{{ manufacturer }}</h4>
+                                        <div v-if="getCompatibleCpuModels(manufacturer).length > 0">
+                                            <button v-for="model in getCompatibleCpuModels(manufacturer)" :key="model.name"
+                                                class="manufacturer-button" :class="getManufacturerClass(manufacturer)"
+                                                @click="selectModel(manufacturer, model)">
+                                                {{ model.name }} (Socket: {{ model.socket }})
+                                            </button>
+                                        </div>
+                                        <div v-else>
+                                            <p>Немає сумісних моделей для цього сокета.</p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </template>
+                            <template v-else-if="manufacturerDialog.component.type === 'ram'">
+                                <button class="manufacturer-button kingston" @click="selectManufacturer('Kingston')">Kingston</button>
+                                <button class="manufacturer-button gskill" @click="selectManufacturer('GSKILL')">GSKILL</button>
+                            </template>
+                            <template v-else-if="manufacturerDialog.component.type === 'gpu'">
+                                <button class="manufacturer-button amd" 
+                                    v-if="manufacturerDialog.component.manufacturers.includes('AMD') && (getMotherboardManufacturer() === 'AMD' || getMotherboardManufacturer() === null)" 
+                                    :class="{ disabled: getMotherboardManufacturer() !== null && getMotherboardManufacturer() !== 'AMD' }"
+                                    @click="selectManufacturer('AMD')">AMD</button>
+                                <button class="manufacturer-button nvidia" 
+                                    v-if="manufacturerDialog.component.manufacturers.includes('NVIDIA') && (getMotherboardManufacturer() === 'Intel' || getMotherboardManufacturer() === null)" 
+                                    :class="{ disabled: getMotherboardManufacturer() !== null && getMotherboardManufacturer() !== 'Intel' }"
+                                    @click="selectManufacturer('NVIDIA')">NVIDIA</button>
+                            </template>
+                            <template v-else-if="manufacturerDialog.component">
+                                <button class="manufacturer-button amd" 
+                                    v-if="manufacturerDialog.component.manufacturers.includes('AMD')" 
+                                    @click="selectManufacturer('AMD')">AMD</button>
+                                <button class="manufacturer-button intel" 
+                                    v-if="manufacturerDialog.component.manufacturers.includes('Intel')" 
+                                    @click="selectManufacturer('Intel')">Intel</button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="details-panel">
+                <h3>{{ detailsPanel.component ? detailsPanel.component.name + (detailsPanel.component.model ? ' (' + detailsPanel.component.model + ')' : '') : 'Виберіть компонент' }}</h3>
+                <p v-if="detailsPanel.component && detailsPanel.component.socketType">
+                    <strong>Сокет:</strong> {{ detailsPanel.component.socketType }}
+                </p>
+                <p v-if="detailsPanel.component && detailsPanel.component.description && detailsPanel.component.description.function">
+                    <strong>Функція:</strong> {{ detailsPanel.component.description.function }}
+                </p>
+                <p v-else><strong>Функція:</strong> Опис відсутній</p>
+                <p v-if="detailsPanel.component && detailsPanel.component.description && detailsPanel.component.description.connection">
+                    <strong>Як підключити:</strong> {{ detailsPanel.component.description.connection }}
+                </p>
+                <p v-else><strong>Як підключити:</strong> Інструкція відсутня</p>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>© 2025 Віртуальна лабораторія. Всі права захищені.</p>
+    </footer>
+    <script>
+        const { createApp } = Vue;
+        const app = createApp({
+            data() {
+                const power24PinWidth = 30;
+                const power24PinHeight = 20;
+                const power8PinWidth = 30;
+                const power8PinHeight = 20;
+                const powerPCIeWidth = 30;
+                const powerPCIeHeight = 20;
+
+                const psu24PinOffsetX = 210;
+                const psu24PinOffsetY = 205;
+                const psu8PinOffsetX = 110;
+                const psu8PinOffsetY = 170;
+                const psuPCIeOffsetX = 110;
+                const psuPCIeOffsetY = 205;
+
+                return {
+                    components: [
+                        {
+                            name: 'Материнська плата',
+                            icon: 'assets/motherboard.png',
+                            defaultWidth: 700,
+                            defaultHeight: 600,
+                            type: 'motherboard',
+                            limit: 1,
+                            needsManufacturer: true,
+                            manufacturers: ['AMD', 'Intel'],
+                            models: {
+                                'AMD': [
+                                    { name: 'AMD B650', socket: 'AM5', icon: 'assets/alt/motherboardAMD_B550.png' },
+                                    { name: 'AMD B450', socket: 'AM4', icon: 'assets/alt/motherboardAMD.png' }
+                                ],
+                                'Intel': [
+                                    { name: 'Intel B760', socket: 'LGA 1700', icon: 'assets/alt/B760.png' },
+                                    { name: 'Intel ATX Q170', socket: 'LGA 1151', icon: 'assets/alt/motherboardINTEL.png' }
+                                ]
+                            },
+                            sockets: {
+                                'AM5': { offsetX: 300, offsetY: 150, width: 100, height: 100 },
+                                'AM4': { offsetX: 324, offsetY: 177, width: 100, height: 100 },
+                                'LGA 1700': { offsetX: 307, offsetY: 132, width: 100, height: 100 },
+                                'LGA 1151': { offsetX: 320, offsetY: 125, width: 110, height: 100 }
+                            },
+                            ramSlots: {
+                                'AM5': {
+                                    'slot1': { offsetX: 500, offsetY: 100, width: 18, height: 220 },
+                                    'slot2': { offsetX: 540, offsetY: 100, width: 18, height: 220 }
+                                },
+                                'AM4': {
+                                    'slot1': { offsetX: 530, offsetY: 113, width: 18, height: 220 },
+                                    'slot2': { offsetX: 560, offsetY: 113, width: 18, height: 220 }
+                                },
+                                'LGA 1700': {
+                                    'slot1': { offsetX: 476, offsetY: 90, width: 18, height: 220 },
+                                    'slot2': { offsetX: 513, offsetY: 90, width: 18, height: 220 }
+                                },
+                                'LGA 1151': {
+                                    'slot1': { offsetX: 530, offsetY: 66, width: 18, height: 220 },
+                                    'slot2': { offsetX: 582, offsetY: 66, width: 18, height: 220 }
+                                }
+                            },
+                            gpuSlots: {
+                                'AM4': { offsetX: 190, offsetY: 460, width: 290, height: 25 },
+                                'AM5': { offsetX: 155, offsetY: 356, width: 290, height: 25 },
+                                'LGA 1700': { offsetX: 190, offsetY: 339, width: 260, height: 25 },
+                                'LGA 1151': { offsetX: 155, offsetY: 419, width: 290, height: 25 }
+                            },
+                            m2Slots: {
+                                'AM4': { offsetX: 304, offsetY: 394, width: 100, height: 50 },
+                                'AM5': { offsetX: 300, offsetY: 396, width: 50, height: 30 },
+                                'LGA 1700': { offsetX: 270, offsetY: 266, width: 50, height: 50 },
+                                'LGA 1151': { offsetX: 560, offsetY: 389, width: 50, height: 50 }
+                            },
+                            powerConnectors: {
+                                'AM4': {
+                                    '24pin': { offsetX: 606, offsetY: 177, width: power24PinWidth, height: power24PinHeight },
+                                    '8pin': { offsetX: 160, offsetY: 53, width: power8PinWidth, height: power8PinHeight },
+                                    'pcie': { offsetX: 390, offsetY: 458, width: powerPCIeWidth, height: powerPCIeHeight }
+                                },
+                                'AM5': {
+                                    '24pin': { offsetX: 595, offsetY: 185, width: power24PinWidth, height: power24PinHeight },
+                                    '8pin': { offsetX: 155, offsetY: 30, width: power8PinWidth, height: power8PinHeight },
+                                    'pcie': { offsetX: 324, offsetY: 354, width: powerPCIeWidth, height: powerPCIeHeight }
+                                },
+                                'LGA 1700': {
+                                    '24pin': { offsetX: 580, offsetY: 150, width: power24PinWidth, height: power24PinHeight },
+                                    '8pin': { offsetX: 190, offsetY: 35, width: power8PinWidth, height: power8PinHeight },
+                                    'pcie': { offsetX: 350, offsetY: 345, width: powerPCIeWidth, height: powerPCIeHeight }
+                                },
+                                'LGA 1151': {
+                                    '24pin': { offsetX: 645, offsetY: 101, width: power24PinWidth, height: power24PinHeight },
+                                    '8pin': { offsetX: 194, offsetY: 46, width: power8PinWidth, height: power8PinHeight },
+                                    'pcie': { offsetX: 340, offsetY: 420, width: powerPCIeWidth, height: powerPCIeHeight }
+                                }
+                            },
+                            description: {
+                                function: 'Материнська плата є центральним елементом комп’ютера, що забезпечує зв’язок між усіма компонентами, такими як процесор, оперативна пам’ять, відеокарта та накопичувачі. Вона містить слоти та роз’єми для підключення всіх пристроїв.',
+                                connection: 'Розмістіть материнську плату на поле. Виберіть виробника (AMD або Intel) та модель із відповідним сокетом.'
+                            }
+                        },
+                        {
+                            name: 'Процесор',
+                            icon: 'assets/cpu.png',
+                            defaultWidth: 90,
+                            defaultHeight: 90,
+                            type: 'cpu',
+                            limit: 1,
+                            needsManufacturer: true,
+                            manufacturers: ['AMD', 'Intel'],
+                            models: {
+                                'AMD': [
+                                    { name: 'Ryzen 7 5700X', socket: 'AM5', icon: 'assets/alt/cpuAMD.png' },
+                                    { name: 'Ryzen 5 5600x', socket: 'AM4', icon: 'assets/alt/cpuAMD_Ryzen5.png' }
+                                ],
+                                'Intel': [
+                                    { name: 'Core i5-13400', socket: 'LGA 1700', icon: 'assets/alt/intel13400.png' },
+                                    { name: 'Core i5-9400', socket: 'LGA 1151', icon: 'assets/alt/cpuINTEL.png' }
+                                ]
+                            },
+                            description: {
+                                function: 'Процесор (CPU) є "мозком" комп’ютера, виконуючи всі обчислення, необхідні для роботи програм і операційної системи. Він обробляє інструкції та дані з оперативної пам’яті.',
+                                connection: 'Виберіть процесор, сумісний із сокетом материнської плати.'
+                            }
+                        },
+                        {
+                            name: 'Оперативна пам\'ять',
+                            icon: 'assets/ram.png',
+                            defaultWidth: 38,
+                            defaultHeight: 310,
+                            type: 'ram',
+                            limit: 2,
+                            needsManufacturer: true,
+                            manufacturers: ['Kingston', 'GSKILL'],
+                            icons: {
+                                'Kingston': 'assets/alt/ramKingston.png',
+                                'GSKILL': 'assets/alt/ramGSKILL.png'
+                            },
+                            description: {
+                                function: 'Оперативна пам’ять (RAM) тимчасово зберігає дані, які активно використовуються процесором, забезпечуючи швидкий доступ для виконання програм. Більший обсяг RAM підвищує продуктивність системи.',
+                                connection: 'Виберіть модуль RAM (Kingston або GSKILL). Перетягніть його в один із синіх слотів RAM на материнській платі.'
+                            }
+                        },
+                        {
+                            name: 'Відеокарта',
+                            icon: 'assets/gpu.png',
+                            defaultWidth: 320,
+                            defaultHeight: 65,
+                            type: 'gpu',
+                            limit: 1,
+                            needsManufacturer: true,
+                            manufacturers: ['AMD', 'NVIDIA'],
+                            icons: {
+                                'AMD': 'assets/alt/gpuAMD.png',
+                                'NVIDIA': 'assets/alt/gpuNVIDIA.png'
+                            },
+                            description: {
+                                function: 'Відеокарта (GPU) відповідає за обробку та рендеринг графічних даних, виводячи зображення на монітор.',
+                                connection: 'Виберіть відеокарту, сумісну з материнською платою (AMD для AMD-плат, NVIDIA для Intel-плат).'
+                            }
+                        },
+                        {
+                            name: 'SSD M.2',
+                            icon: 'assets/SSD.png',
+                            canvasIcon: 'assets/alt/SSD.png',
+                            defaultWidth: 165,
+                            defaultHeight: 50,
+                            type: 'ssd',
+                            limit: 1,
+                            needsManufacturer: false,
+                            description: {
+                                function: 'SSD M.2 — швидкий твердотільний накопичувач, який зберігає операційну систему, програми та файли.',
+                                connection: 'Перетягніть SSD у помаранчевий слот M.2 на материнській платі.'
+                            }
+                        },
+                        {
+                            name: 'Живлення',
+                            icon: 'assets/power.png',
+                            canvasIcon: 'assets/alt/power1.png',
+                            defaultWidth: 350,
+                            defaultHeight: 300,
+                            type: 'power',
+                            limit: 1,
+                            needsManufacturer: false,
+                            powerPoints: {
+                                '24pin': { offsetX: psu24PinOffsetX, offsetY: psu24PinOffsetY },
+                                '8pin': { offsetX: psu8PinOffsetX, offsetY: psu8PinOffsetY },
+                                'pcie': { offsetX: psuPCIeOffsetX, offsetY: psuPCIeOffsetY }
+                            },
+                            description: {
+                                function: 'Блок живлення (PSU) постачає електроенергію до всіх компонентів комп’ютера.',
+                                connection: 'Розмістіть блок живлення на canvas. Кабелі автоматично підключаться до роз’ємів.'
+                            }
+                        },
+                        {
+                            name: 'Монітор',
+                            icon: 'assets/monitor.png',
+							canvasIcon: 'assets/alt/monitor.png',
+                            defaultWidth: 700,
+                            defaultHeight: 450,
+                            type: 'monitor',
+                            limit: 0,
+                            needsManufacturer: false,
+                            description: {
+                                function: 'Монітор відображає графічний інтерфейс комп’ютера.',
+                                connection: 'Розмістіть монітор на canvas.'
+                            }
+                        }
+                    ],
+                    placedComponents: [],
+                    dragging: null,
+                    offsetX: 0,
+                    offsetY: 0,
+                    mouseX: 0,
+                    mouseY: 0,
+                    componentImages: {},
+                    contextMenu: {
+                        visible: false,
+                        x: 0,
+                        y: 0,
+                        targetComponent: null,
+                        isSsd: false
+                    },
+                    notification: {
+                        visible: false,
+                        message: '',
+                        timeout: null
+                    },
+                    manufacturerDialog: {
+                        visible: false,
+                        component: null
+                    },
+                    detailsPanel: {
+                        component: null
+                    },
+                    motherboardCoordinates: {
+                        visible: false,
+                        x: 0,
+                        y: 0
+                    },
+                    cpuInSocket: false,
+                    ramInSlots: false,
+                    gpuInSlot: false,
+                    ssdInSlot: false,
+                    powerConnected: false
+                }
+            },
+            methods: {
+                selectComponent(component) {
+                    if (this.isComponentLimitReached(component.type)) {
+                        this.showNotification(`Досягнуто ліміт для компонента "${component.name}"`);
+                        return;
+                    }
+                    if (component.type === 'cpu') {
+                        const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                        if (motherboard) {
+                            console.log('Motherboard socketType:', motherboard.socketType);
+                        }
+                        if (motherboard && !this.checkComponentCompatibility(component)) {
+                            this.showNotification(`Процесор повинен бути сумісний із сокетом материнської плати (${motherboard.socketType})`);
+                            return;
+                        }
+                    }
+                    if (component.type === 'gpu') {
+                        const motherboardManufacturer = this.getMotherboardManufacturer();
+                        if (motherboardManufacturer) {
+                            if (!this.checkGpuCompatibilityWithMotherboard(component, motherboardManufacturer)) {
+                                this.showNotification(`Відеокарта повинна бути сумісною з материнською платою (${motherboardManufacturer})`);
+                                return;
+                            }
+                        }
+                    }
+                    if (component.needsManufacturer) {
+                        this.manufacturerDialog.visible = false;
+                        this.manufacturerDialog.component = { ...component };
+                        this.manufacturerDialog.visible = true;
+                    } else {
+                        this.addToCanvas(component);
+                    }
+                },
+                getManufacturerClass(manufacturer) {
+                    return {
+                        'amd': manufacturer === 'AMD',
+                        'intel': manufacturer === 'Intel',
+                        'kingston': manufacturer === 'Kingston',
+                        'gskill': manufacturer === 'GSKILL',
+                        'nvidia': manufacturer === 'NVIDIA'
+                    };
+                },
+                getCompatibleCpuModels(manufacturer) {
+                    const cpuComponent = this.components.find(comp => comp.type === 'cpu');
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!cpuComponent || !cpuComponent.models[manufacturer]) {
+                        console.log(`No CPU component or models for manufacturer ${manufacturer}`);
+                        return [];
+                    }
+                    console.log('CPU models for', manufacturer, ':', cpuComponent.models[manufacturer]);
+                    if (!motherboard || !motherboard.socketType) {
+                        console.log('No motherboard or socketType, returning all models:', cpuComponent.models[manufacturer]);
+                        return cpuComponent.models[manufacturer];
+                    }
+                    console.log('Motherboard socketType:', motherboard.socketType);
+                    const compatibleModels = cpuComponent.models[manufacturer].filter(
+                        model => model.socket === motherboard.socketType
+                    );
+                    console.log('Compatible CPU models:', compatibleModels);
+                    return compatibleModels;
+                },
+                selectModel(manufacturer, model) {
+                    if (!this.manufacturerDialog.component) {
+                        this.manufacturerDialog.visible = false;
+                        return;
+                    }
+                    if (this.manufacturerDialog.component.type === 'cpu') {
+                        const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                        if (motherboard && model.socket !== motherboard.socketType) {
+                            this.showNotification(`Процесор ${model.name} (Socket: ${model.socket}) несумісний з материнською платою (Socket: ${motherboard.socketType})`);
+                            this.manufacturerDialog.visible = false;
+                            this.manufacturerDialog.component = null;
+                            return;
+                        }
+                    }
+                    const component = this.manufacturerDialog.component;
+                    this.manufacturerDialog.visible = false;
+                    this.manufacturerDialog.component = null;
+                    this.addToCanvas(component, manufacturer, model);
+                },
+                selectManufacturer(manufacturer) {
+                    if (!this.manufacturerDialog.component) {
+                        this.manufacturerDialog.visible = false;
+                        return;
+                    }
+                    if (this.manufacturerDialog.component.type === 'gpu') {
+                        const motherboardManufacturer = this.getMotherboardManufacturer();
+                        if (motherboardManufacturer) {
+                            if (manufacturer === 'AMD' && motherboardManufacturer !== 'AMD') {
+                                this.showNotification(`Відеокарта AMD сумісна лише з материнською платою AMD`);
+                                this.manufacturerDialog.visible = false;
+                                this.manufacturerDialog.component = null;
+                                return;
+                            }
+                            if (manufacturer === 'NVIDIA' && motherboardManufacturer !== 'Intel') {
+                                this.showNotification(`Відеокарта NVIDIA сумісна лише з материнською платою Intel`);
+                                this.manufacturerDialog.visible = false;
+                                this.manufacturerDialog.component = null;
+                                return;
+                            }
+                        }
+                    }
+                    const component = this.manufacturerDialog.component;
+                    this.manufacturerDialog.visible = false;
+                    this.manufacturerDialog.component = null;
+                    this.addToCanvas(component, manufacturer);
+                },
+                addToCanvas(component, manufacturer = null, model = null) {
+                    let iconPath = component.canvasIcon || component.icon;
+                    let socketType = null;
+                    if (model && model.icon) {
+                        iconPath = model.icon;
+                    } else if (manufacturer && component.icons && component.icons[manufacturer]) {
+                        iconPath = component.icons[manufacturer];
+                    }
+                    if (model && model.socket) {
+                        socketType = model.socket;
+                    }
+                    console.log('Adding component:', component.type, 'with socketType:', socketType);
+                    const newComponent = {
+                        ...component,
+                        icon: iconPath,
+                        x: 100,
+                        y: 100,
+                        width: component.defaultWidth || 130,
+                        height: component.defaultHeight || 120,
+                        manufacturer: manufacturer,
+                        model: model ? model.name : null,
+                        socketType: socketType,
+                        socket: component.sockets && socketType ? { ...component.sockets[socketType] } : null,
+                        ramSlots: component.ramSlots && socketType ? { ...component.ramSlots[socketType] } : null,
+                        gpuSlots: component.gpuSlots && socketType ? { ...component.gpuSlots[socketType] } : null,
+                        m2Slots: component.m2Slots && socketType ? { ...component.m2Slots[socketType] } : null,
+                        powerConnectors: component.powerConnectors && socketType ? { ...component.powerConnectors[socketType] } : null,
+                        powerPoints: component.powerPoints || null,
+                        rotation: component.type === 'ssd' ? 0 : undefined
+                    };
+
+                    this.preloadImage(iconPath, () => {
+                        this.placedComponents.push(newComponent);
+                        this.drawCanvas();
+                        if (component.type === 'motherboard') {
+                            this.checkCpuCompatibility();
+                            this.checkGpuCompatibility();
+                        }
+                        this.checkRamInSlots();
+                        this.checkGpuInSlot();
+                        this.checkSsdInSlot();
+                        this.checkPowerConnected();
+                    });
+                },
+                preloadImage(src, callback) {
+                    if (this.componentImages[src]) {
+                        callback();
+                        return;
+                    }
+                    const img = new Image();
+                    img.onload = () => {
+                        this.componentImages[src] = img;
+                        callback();
+                    };
+                    img.src = src;
+                },
+                isAllAssembledCorrectly() {
+                    return (
+                        this.isComponentPlaced('motherboard') &&
+                        this.isComponentPlaced('cpu') && this.cpuInSocket &&
+                        this.isComponentPlaced('ram') && this.ramInSlots &&
+                        this.isComponentPlaced('gpu') && this.gpuInSlot &&
+                        this.isComponentPlaced('ssd') && this.ssdInSlot &&
+                        this.isComponentPlaced('power') && this.powerConnected
+                    );
+                },
+                drawCanvas() {
+                    const canvas = document.getElementById('lab-canvas');
+                    const ctx = canvas.getContext('2d');
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    const psu = this.placedComponents.find(comp => comp.type === 'power');
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+
+                    this.placedComponents.forEach((comp) => {
+                        if (this.componentImages[comp.icon]) {
+                            ctx.save();
+                            if (comp.type === 'ssd' && comp.rotation !== undefined) {
+                                ctx.translate(comp.x + comp.width / 2, comp.y + comp.height / 2);
+                                ctx.rotate((comp.rotation * Math.PI) / 180);
+                                ctx.drawImage(
+                                    this.componentImages[comp.icon],
+                                    -comp.width / 2,
+                                    -comp.height / 2,
+                                    comp.width,
+                                    comp.height
+                                );
+                            } else {
+                                ctx.drawImage(this.componentImages[comp.icon], comp.x, comp.y, comp.width, comp.height);
+                            }
+
+                            if (comp.type === 'motherboard') {
+                                if (comp.socket) {
+                                    ctx.strokeStyle = 'red';
+                                    ctx.lineWidth = 2;
+                                    ctx.strokeRect(
+                                        comp.x + comp.socket.offsetX,
+                                        comp.y + comp.socket.offsetY,
+                                        comp.socket.width,
+                                        comp.socket.height
+                                    );
+                                }
+
+                                if (comp.ramSlots) {
+                                    const ramSlots = comp.ramSlots;
+                                    ctx.strokeStyle = 'blue';
+                                    ctx.lineWidth = 2;
+                                    ctx.strokeRect(
+                                        comp.x + ramSlots.slot1.offsetX,
+                                        comp.y + ramSlots.slot1.offsetY,
+                                        ramSlots.slot1.width,
+                                        ramSlots.slot1.height
+                                    );
+                                    ctx.strokeRect(
+                                        comp.x + ramSlots.slot2.offsetX,
+                                        comp.y + ramSlots.slot2.offsetY,
+                                        ramSlots.slot2.width,
+                                        ramSlots.slot2.height
+                                    );
+                                }
+
+                                if (comp.gpuSlots) {
+                                    const gpuSlot = comp.gpuSlots;
+                                    ctx.strokeStyle = 'purple';
+                                    ctx.lineWidth = 2;
+                                    ctx.strokeRect(
+                                        comp.x + gpuSlot.offsetX,
+                                        comp.y + gpuSlot.offsetY,
+                                        gpuSlot.width,
+                                        gpuSlot.height
+                                    );
+                                }
+
+                                if (comp.m2Slots) {
+                                    const m2Slot = comp.m2Slots;
+                                    ctx.strokeStyle = 'orange';
+                                    ctx.lineWidth = 2;
+                                    ctx.strokeRect(
+                                        comp.x + m2Slot.offsetX,
+                                        comp.y + m2Slot.offsetY,
+                                        m2Slot.width,
+                                        m2Slot.height
+                                    );
+                                }
+
+                                if (comp.powerConnectors) {
+                                    const powerConnectors = comp.powerConnectors;
+                                    ctx.strokeStyle = comp.manufacturer === 'AMD' ? 'red' : 'blue';
+                                    ctx.lineWidth = 2;
+
+                                    ctx.strokeRect(
+                                        comp.x + powerConnectors['24pin'].offsetX,
+                                        comp.y + powerConnectors['24pin'].offsetY,
+                                        powerConnectors['24pin'].width,
+                                        powerConnectors['24pin'].height
+                                    );
+
+                                    ctx.strokeRect(
+                                        comp.x + powerConnectors['8pin'].offsetX,
+                                        comp.y + powerConnectors['8pin'].offsetY,
+                                        powerConnectors['8pin'].width,
+                                        powerConnectors['8pin'].height
+                                    );
+
+                                    ctx.strokeRect(
+                                        comp.x + powerConnectors['pcie'].offsetX,
+                                        comp.y + powerConnectors['pcie'].offsetY,
+                                        powerConnectors['pcie'].width,
+                                        powerConnectors['pcie'].height
+                                    );
+                                }
+                            }
+
+                            if (comp.type === 'cpu' && this.cpuInSocket) {
+                                ctx.strokeStyle = 'green';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(comp.x, comp.y, comp.width, comp.height);
+                            }
+
+                            if (comp.type === 'ram' && this.isRamInSlot(comp)) {
+                                ctx.strokeStyle = 'green';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(comp.x, comp.y, comp.width, comp.height);
+                            }
+
+                            if (comp.type === 'gpu' && this.isGpuInSlot(comp)) {
+                                ctx.strokeStyle = 'green';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(comp.x, comp.y, comp.width, comp.height);
+                            }
+
+                            if (comp.type === 'ssd' && this.isSsdInSlot(comp)) {
+                                ctx.strokeStyle = 'green';
+                                ctx.lineWidth = 2;
+                                ctx.translate(comp.x + comp.width / 2, comp.y + comp.height / 2);
+                                ctx.rotate((comp.rotation * Math.PI) / 180);
+                                ctx.strokeRect(-comp.width / 2, -comp.height / 2, comp.width, comp.height);
+                            }
+
+                            if (comp.type === 'monitor' && this.isAllAssembledCorrectly()) {
+                                ctx.fillStyle = 'white';
+                                ctx.font = 'bold 48px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText('Все правильно!', comp.x + comp.width / 2, comp.y + comp.height / 3);
+                            }
+
+                            if (comp.manufacturer) {
+                                ctx.save();
+                                if (comp.manufacturer === 'AMD') ctx.fillStyle = '#ED1C24';
+                                else if (comp.manufacturer === 'Intel') ctx.fillStyle = '#0071C5';
+                                else if (comp.manufacturer === 'NVIDIA') ctx.fillStyle = '#76B900';
+                                else if (comp.manufacturer === 'Kingston') ctx.fillStyle = '#000000';
+                                else if (comp.manufacturer === 'GSKILL') ctx.fillStyle = '#FF0000';
+                                ctx.fillRect(comp.x + comp.width - 40, comp.y + comp.height - 20, 35, 15);
+                                ctx.fillStyle = 'white';
+                                ctx.font = '10px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(comp.manufacturer, comp.x + comp.width - 22, comp.y + comp.height - 12);
+                                ctx.restore();
+                            }
+                            ctx.restore();
+                        } else {
+                            this.preloadImage(comp.icon, () => this.drawCanvas());
+                        }
+                    });
+
+                    if (psu && motherboard && motherboard.powerConnectors) {
+                        const powerConnectors = motherboard.powerConnectors;
+                        const powerPoints = psu.powerPoints;
+
+                        const psu24PinX = psu.x + powerPoints['24pin'].offsetX;
+                        const psu24PinY = psu.y + powerPoints['24pin'].offsetY;
+                        const psu8PinX = psu.x + powerPoints['8pin'].offsetX;
+                        const psu8PinY = psu.y + powerPoints['8pin'].offsetY;
+                        const psuPCIeX = psu.x + powerPoints['pcie'].offsetX;
+                        const psuPCIeY = psu.y + powerPoints['pcie'].offsetY;
+
+                        const atx24PinX = motherboard.x + powerConnectors['24pin'].offsetX;
+                        const atx24PinY = motherboard.y + powerConnectors['24pin'].offsetY;
+
+                        const cpu8PinX = motherboard.x + powerConnectors['8pin'].offsetX;
+                        const cpu8PinY = motherboard.y + powerConnectors['8pin'].offsetY;
+
+                        const pcieX = motherboard.x + powerConnectors['pcie'].offsetX;
+                        const pcieY = motherboard.y + powerConnectors['pcie'].offsetY;
+
+                        if (this.cpuInSocket || this.ramInSlots || this.gpuInSlot || this.ssdInSlot) {
+                            ctx.beginPath();
+                            ctx.moveTo(psu24PinX, psu24PinY);
+                            ctx.lineTo(atx24PinX, atx24PinY);
+                            ctx.strokeStyle = motherboard.manufacturer === 'AMD' ? 'red' : 'blue';
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                        }
+
+                        if (this.cpuInSocket) {
+                            ctx.beginPath();
+                            ctx.moveTo(psu8PinX, psu8PinY);
+                            ctx.lineTo(cpu8PinX, cpu8PinY);
+                            ctx.strokeStyle = motherboard.manufacturer === 'AMD' ? 'red' : 'blue';
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                        }
+
+                        if (this.gpuInSlot) {
+                            ctx.beginPath();
+                            ctx.moveTo(psuPCIeX, psuPCIeY);
+                            ctx.lineTo(pcieX, pcieY);
+                            ctx.strokeStyle = motherboard.manufacturer === 'AMD' ? 'red' : 'blue';
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                        }
+                    }
+                },
+                handleMouseDown(event) {
+                    this.contextMenu.visible = false;
+                    if (event.button === 0) {
+                        this.startDrag(event);
+                    }
+                },
+                startDrag(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    for (let i = this.placedComponents.length - 1; i >= 0; i--) {
+                        const comp = this.placedComponents[i];
+                        if (canvasX >= comp.x && canvasX <= comp.x + comp.width && 
+                            canvasY >= comp.y && canvasY <= comp.y + comp.height) {
+                            this.dragging = i;
+                            this.offsetX = canvasX - comp.x;
+                            this.offsetY = canvasY - comp.y;
+                            break;
+                        }
+                    }
+                },
+                onMouseMove(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    
+                    this.mouseX = Math.round(canvasX);
+                    this.mouseY = Math.round(canvasY);
+                    
+                    if (this.dragging !== null) {
+                        this.placedComponents[this.dragging].x = canvasX - this.offsetX;
+                        this.placedComponents[this.dragging].y = canvasY - this.offsetY;
+                        requestAnimationFrame(() => this.drawCanvas());
+                    }
+                    this.updateMotherboardCoordinates(canvasX, canvasY);
+                    this.checkCpuInSocket();
+                    this.checkRamInSlots();
+                    this.checkGpuInSlot();
+                    this.checkSsdInSlot();
+                    this.checkPowerConnected();
+                },
+                stopDrag() {
+                    this.dragging = null;
+                    this.checkCpuInSocket();
+                    this.checkRamInSlots();
+                    this.checkGpuInSlot();
+                    this.checkSsdInSlot();
+                    this.checkPowerConnected();
+                    this.drawCanvas();
+                },
+                showContextMenu(event) {
+                    const canvas = document.getElementById('lab-canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const canvasX = x * scaleX;
+                    const canvasY = y * scaleY;
+                    let targetComponent = null;
+                    for (let i = this.placedComponents.length - 1; i >= 0; i--) {
+                        const comp = this.placedComponents[i];
+                        if (canvasX >= comp.x && canvasX <= comp.x + comp.width && 
+                            canvasY >= comp.y && canvasY <= comp.y + comp.height) {
+                            targetComponent = i;
+                            break;
+                        }
+                    }
+                    if (targetComponent !== null) {
+                        this.contextMenu = {
+                            visible: true,
+                            x: event.clientX,
+                            y: event.clientY + 10,
+                            targetComponent: targetComponent,
+                            isSsd: this.placedComponents[targetComponent].type === 'ssd'
+                        };
+                    }
+                },
+                deleteComponent() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const comp = this.placedComponents[this.contextMenu.targetComponent];
+                        const isMotherboard = comp.type === 'motherboard';
+                        this.placedComponents.splice(this.contextMenu.targetComponent, 1);
+                        if (isMotherboard) {
+                            this.checkCpuCompatibility();
+                            this.checkGpuCompatibility();
+                            this.checkRamInSlots();
+                            this.checkGpuInSlot();
+                            this.checkSsdInSlot();
+                        }
+                        this.checkPowerConnected();
+                        this.drawCanvas();
+                        this.contextMenu.visible = false;
+                        if (this.detailsPanel.component && this.detailsPanel.component === comp) {
+                            this.detailsPanel.component = null;
+                        }
+                    }
+                },
+                rotateSsd() {
+                    if (this.contextMenu.targetComponent !== null && this.contextMenu.isSsd) {
+                        const comp = this.placedComponents[this.contextMenu.targetComponent];
+                        comp.rotation = (comp.rotation + 90) % 360;
+                        this.contextMenu.visible = false;
+                        this.drawCanvas();
+                    }
+                },
+                showDetails() {
+                    if (this.contextMenu.targetComponent !== null) {
+                        const comp = this.placedComponents[this.contextMenu.targetComponent];
+                        this.detailsPanel.component = comp;
+                        this.contextMenu.visible = false;
+                    }
+                },
+                getMotherboardManufacturer() {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    return motherboard ? motherboard.manufacturer : null;
+                },
+                checkComponentCompatibility(component) {
+                    if (component.type !== 'cpu') return true;
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || !motherboard.socketType) return true;
+                    const compatible = component.manufacturers.some(manufacturer =>
+                        component.models[manufacturer].some(model => model.socket === motherboard.socketType)
+                    );
+                    console.log('Checking CPU compatibility for all manufacturers:', compatible);
+                    return compatible;
+                },
+                checkGpuCompatibilityWithMotherboard(component, motherboardManufacturer) {
+                    if (component.type !== 'gpu') return true;
+                    return true;
+                },
+                checkGpuCompatibility() {
+                    const motherboardManufacturer = this.getMotherboardManufacturer();
+                    if (!motherboardManufacturer) return;
+
+                    const gpuIndices = this.placedComponents
+                        .map((comp, index) => (comp.type === 'gpu' ? index : -1))
+                        .filter(index => index !== -1);
+
+                    gpuIndices.forEach(index => {
+                        const gpu = this.placedComponents[index];
+                        if (
+                            (gpu.manufacturer === 'AMD' && motherboardManufacturer !== 'AMD') ||
+                            (gpu.manufacturer === 'NVIDIA' && motherboardManufacturer !== 'Intel')
+                        ) {
+                            this.placedComponents.splice(index, 1);
+                            this.showNotification(`Відеокарта ${gpu.manufacturer} видалена через несумісність з материнською платою ${motherboardManufacturer}`);
+                            if (this.detailsPanel.component && this.detailsPanel.component === gpu) {
+                                this.detailsPanel.component = null;
+                            }
+                        }
+                    });
+                },
+                checkCpuCompatibility() {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || !motherboard.socketType) return;
+                    const cpuIndex = this.placedComponents.findIndex(comp => comp.type === 'cpu');
+                    if (cpuIndex !== -1) {
+                        const cpu = this.placedComponents[cpuIndex];
+                        if (cpu.socketType !== motherboard.socketType) {
+                            this.placedComponents.splice(cpuIndex, 1);
+                            this.showNotification(`Процесор ${cpu.model} (Socket: ${cpu.socketType}) видалено через несумісність з материнською платою ${motherboard.model} (Socket: ${motherboard.socketType})`);
+                            if (this.detailsPanel.component && this.detailsPanel.component === cpu) {
+                                this.detailsPanel.component = null;
+                            }
+                        }
+                    }
+                },
+                isComponentDisabled(component) {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || !motherboard.socketType) return false;
+                    if (component.type === 'cpu') {
+                        return !component.models[component.manufacturers[0]].some(model => model.socket === motherboard.socketType);
+                    }
+                    if (component.type === 'gpu') {
+                        return false;
+                    }
+                    return false;
+                },
+                isComponentLimitReached(type) {
+                    if (!type) return false;
+                    const componentInfo = this.components.find(comp => comp.type === type);
+                    if (!componentInfo || componentInfo.limit === 0) return false;
+                    const count = this.getComponentCount(type);
+                    return count >= componentInfo.limit;
+                },
+                getComponentCount(type) {
+                    return this.placedComponents.filter(comp => comp.type === type).length;
+                },
+                showNotification(message) {
+                    if (this.notification.timeout) {
+                        clearTimeout(this.notification.timeout);
+                    }
+                    this.notification.message = message;
+                    this.notification.visible = true;
+                    this.notification.timeout = setTimeout(() => {
+                        this.hideNotification();
+                    }, 3000);
+                },
+                hideNotification() {
+                    this.notification.visible = false;
+                },
+                updateMotherboardCoordinates(x, y) {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (motherboard) {
+                        if (x >= motherboard.x && x <= motherboard.x + motherboard.width &&
+                            y >= motherboard.y && y <= motherboard.y + motherboard.height) {
+                            const mbX = Math.round(x - motherboard.x);
+                            const mbY = Math.round(y - motherboard.y);
+                            this.motherboardCoordinates = {
+                                visible: true,
+                                x: mbX,
+                                y: mbY
+                            };
+                        } else {
+                            this.motherboardCoordinates.visible = false;
+                        }
+                    } else {
+                        this.motherboardCoordinates.visible = false;
+                    }
+                },
+                isComponentPlaced(type) {
+                    if (type === 'power') {
+                        return this.powerConnected;
+                    }
+                    return this.placedComponents.some(comp => comp.type === type);
+                },
+                checkCpuInSocket() {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    const cpu = this.placedComponents.find(comp => comp.type === 'cpu');
+                    if (!motherboard || !cpu || !motherboard.socket) {
+                        this.cpuInSocket = false;
+                        return;
+                    }
+                    const socketX = motherboard.x + motherboard.socket.offsetX;
+                    const socketY = motherboard.y + motherboard.socket.offsetY;
+                    const socketWidth = motherboard.socket.width;
+                    const socketHeight = motherboard.socket.height;
+                    const cpuX = cpu.x;
+                    const cpuY = cpu.y;
+                    this.cpuInSocket = (
+                        cpuX >= socketX && cpuX + cpu.width <= socketX + socketWidth &&
+                        cpuY >= socketY && cpuY + cpu.height <= socketY + socketHeight
+                    );
+                    if (!this.cpuInSocket && this.isComponentPlaced('cpu') && this.isComponentPlaced('motherboard')) {
+                        this.showNotification('Процесор не в сокеті материнської плати!');
+                    }
+                },
+                isRamInSlot(ram) {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || !motherboard.ramSlots) return false;
+
+                    const ramSlots = motherboard.ramSlots;
+
+                    const slot1X = motherboard.x + ramSlots.slot1.offsetX;
+                    const slot1Y = motherboard.y + ramSlots.slot1.offsetY;
+                    const slot1Right = slot1X + ramSlots.slot1.width;
+                    const slot1Bottom = slot1Y + ramSlots.slot1.height;
+
+                    const slot2X = motherboard.x + ramSlots.slot2.offsetX;
+                    const slot2Y = motherboard.y + ramSlots.slot2.offsetY;
+                    const slot2Right = slot2X + ramSlots.slot2.width;
+                    const slot2Bottom = slot2Y + ramSlots.slot2.height;
+
+                    const hitboxPaddingX = ram.width * 0.2;
+                    const hitboxPaddingY = ram.height * 0.2;
+
+                    const ramX = ram.x + hitboxPaddingX;
+                    const ramY = ram.y + hitboxPaddingY;
+                    const ramRight = ramX + ram.width - (hitboxPaddingX * 2);
+                    const ramBottom = ramY + ram.height - (hitboxPaddingY * 2);
+
+                    const intersectsSlot1 = !(
+                        ramRight < slot1X ||
+                        ramX > slot1Right ||
+                        ramBottom < slot1Y ||
+                        ramY > slot1Bottom
+                    );
+
+                    const intersectsSlot2 = !(
+                        ramRight < slot2X ||
+                        ramX > slot2Right ||
+                        ramBottom < slot2Y ||
+                        ramY > slot2Bottom
+                    );
+
+                    return intersectsSlot1 || intersectsSlot2;
+                },
+                checkRamInSlots() {
+                    const ramComponents = this.placedComponents.filter(comp => comp.type === 'ram');
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || ramComponents.length === 0) {
+                        this.ramInSlots = false;
+                        return;
+                    }
+
+                    const allRamInSlots = ramComponents.every(ram => this.isRamInSlot(ram));
+                    this.ramInSlots = allRamInSlots;
+
+                    if (!this.ramInSlots && this.isComponentPlaced('ram') && this.isComponentPlaced('motherboard')) {
+                        this.showNotification('Оперативна пам’ять не в слотах материнської плати!');
+                    }
+                },
+                isGpuInSlot(gpu) {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || !motherboard.gpuSlots) return false;
+
+                    const gpuSlot = motherboard.gpuSlots;
+
+                    const slotX = motherboard.x + gpuSlot.offsetX;
+                    const slotY = motherboard.y + gpuSlot.offsetY;
+                    const slotRight = slotX + gpuSlot.width;
+                    const slotBottom = slotY + gpuSlot.height;
+
+                    const hitboxPaddingX = gpu.width * 0.2;
+                    const hitboxPaddingY = gpu.height * 0.2;
+
+                    const gpuX = gpu.x + hitboxPaddingX;
+                    const gpuY = gpu.y + hitboxPaddingY;
+                    const gpuRight = gpuX + gpu.width - (hitboxPaddingX * 2);
+                    const gpuBottom = gpuY + gpu.height - (hitboxPaddingY * 2);
+
+                    const intersectsSlot = !(
+                        gpuRight < slotX ||
+                        gpuX > slotRight ||
+                        gpuBottom < slotY ||
+                        gpuY > slotBottom
+                    );
+
+                    return intersectsSlot;
+                },
+                checkGpuInSlot() {
+                    const gpuComponents = this.placedComponents.filter(comp => comp.type === 'gpu');
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || gpuComponents.length === 0) {
+                        this.gpuInSlot = false;
+                        return;
+                    }
+
+                    const allGpuInSlots = gpuComponents.every(gpu => this.isGpuInSlot(gpu));
+                    this.gpuInSlot = allGpuInSlots;
+
+                    if (!this.gpuInSlot && this.isComponentPlaced('gpu') && this.isComponentPlaced('motherboard')) {
+                        this.showNotification('Відеокарта не в слоті материнської плати!');
+                    }
+                },
+                isSsdInSlot(ssd) {
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || !motherboard.m2Slots) return false;
+
+                    const m2Slot = motherboard.m2Slots;
+
+                    const slotX = motherboard.x + m2Slot.offsetX;
+                    const slotY = motherboard.y + m2Slot.offsetY;
+                    const slotRight = slotX + m2Slot.width;
+                    const slotBottom = slotY + m2Slot.height;
+
+                    const hitboxPaddingX = ssd.width * 0.1;
+                    const hitboxPaddingY = ssd.height * 0.1;
+
+                    const ssdX = ssd.x + hitboxPaddingX;
+                    const ssdY = ssd.y + hitboxPaddingY;
+                    const ssdRight = ssdX + ssd.width - (hitboxPaddingX * 2);
+                    const ssdBottom = ssdY + ssd.height - (hitboxPaddingY * 2);
+
+                    return !(
+                        ssdRight < slotX ||
+                        ssdX > slotRight ||
+                        ssdBottom < slotY ||
+                        ssdY > slotBottom
+                    );
+                },
+                checkSsdInSlot() {
+                    const ssdComponents = this.placedComponents.filter(comp => comp.type === 'ssd');
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!motherboard || ssdComponents.length === 0) {
+                        this.ssdInSlot = false;
+                        return;
+                    }
+
+                    const allSsdInSlots = ssdComponents.every(ssd => this.isSsdInSlot(ssd));
+                    this.ssdInSlot = allSsdInSlots;
+
+                    if (this.ssdInSlot) {
+                        this.showNotification('SSD встановлено!');
+                    } else if (this.isComponentPlaced('ssd') && this.isComponentPlaced('motherboard')) {
+                        this.showNotification('SSD не в слоті материнської плати!');
+                    }
+                },
+                checkPowerConnected() {
+                    const psu = this.placedComponents.find(comp => comp.type === 'power');
+                    const motherboard = this.placedComponents.find(comp => comp.type === 'motherboard');
+                    if (!psu || !motherboard) {
+                        this.powerConnected = false;
+                        return;
+                    }
+
+                    this.powerConnected = this.cpuInSocket || this.ramInSlots || this.gpuInSlot || this.ssdInSlot;
+                    if (this.powerConnected) {
+                        this.showNotification('Живлення підключено!');
+                    }
+                }
+            },
+            mounted() {
+                this.drawCanvas();
+                document.addEventListener('click', (event) => {
+                    if (this.contextMenu.visible && !event.target.closest('#lab-canvas') && !event.target.closest('.context-menu')) {
+                        this.contextMenu.visible = false;
+                    }
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        this.manufacturerDialog.visible = false;
+                        this.manufacturerDialog.component = null;
+                        this.detailsPanel.component = null;
+                    }
+                });
+            }
+        });
+        app.mount('#app');
+    </script>
+</body>
+</html>
